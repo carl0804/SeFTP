@@ -67,3 +67,62 @@ func (seftpCon *SeFTPController) GetText() (string, error) {
 	}
 	return "", rErr
 }
+
+type SubFTPController struct {
+	ServerAddr string
+	Conn       net.Conn
+	Passwd     [32]byte
+}
+
+func (subftpCon *SubFTPController) EstabConn() {
+	conn, err := net.Dial("tcp", subftpCon.ServerAddr)
+	if err != nil {
+		panic(err)
+	}
+	subftpCon.Conn = conn
+	log.Println("Conn Established.")
+}
+
+func (subftpCon *SubFTPController) CloseConn() {
+	subftpCon.Conn.Close()
+	fmt.Println("Dial closed.")
+}
+
+func (subftpCon *SubFTPController) SendText(text string) {
+	nonce := make([]byte, 12)
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		panic(err.Error())
+	}
+
+	encByte := GCMEncrypter([]byte(text), subftpCon.Passwd, nonce)
+	//encLength := GCMEncrypter(strconv.Itoa(len(encByte)), "AES256Key-32Characters1234567890", nonce)
+	//fmt.Println("Nonce:", nonce)
+	bs := make([]byte, 2)
+	binary.LittleEndian.PutUint16(bs, uint16(len(encByte)))
+	//fmt.Println("Length:", bs)
+	//fmt.Println("Data:", encByte)
+	finalPac := append(append(nonce, bs...), encByte...)
+	subftpCon.Conn.Write(finalPac)
+}
+
+func (subftpCon *SubFTPController) GetText() (string, error) {
+	buf := make([]byte, 4096)
+	_, rErr := subftpCon.Conn.Read(buf)
+
+	if rErr == nil {
+		//fmt.Println(buf[:])
+		nonce, buf := buf[:12], buf[12:]
+		//fmt.Println("Nonce:", nonce)
+		lth, buf := buf[:2], buf[2:]
+		length := binary.LittleEndian.Uint16(lth)
+		//fmt.Println("Length:", length)
+		data, buf := buf[:length], buf[length:]
+		//fmt.Println("Data:", data)
+		//fmt.Println("Remain:", buf)
+		decData := GCMDecrypter(data, subftpCon.Passwd, nonce)
+		//fmt.Println("Package Length:", rLen)
+		//fmt.Println("decData:", string(decData))
+		return string(decData), nil
+	}
+	return "", rErr
+}
