@@ -1,0 +1,1 @@
+SeFTP is a fast, secure and reliable file transfer protocol written in Golang.
