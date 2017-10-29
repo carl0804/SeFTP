@@ -10,6 +10,7 @@ import (
 	"net"
 	"log"
 	"strings"
+	//"io"
 )
 
 type Config struct {
@@ -82,8 +83,26 @@ func main() {
 				command := strings.Fields(plainCommand)
 				switch command[0] {
 				case "SIZE":
-					log.Println("FILE SIZE: ", command[1])
-					subftpCon.SendText("READY")
+					fileSize, err := strconv.Atoi(command[1])
+					checkerr(err)
+					log.Println("FILE SIZE: ", fileSize)
+					reader := bufio.NewReader(os.Stdin)
+					fmt.Print("Enter File Name: ")
+					fileName, _ := reader.ReadString('\n')
+					f, err := os.Create(strings.Fields(fileName)[0])
+					checkerr(err)
+					defer f.Close()
+					recvSize := 0
+					for recvSize < fileSize{
+						subftpCon.SendText("READY")
+						buf, err := subftpCon.GetByte()
+						checkerr(err)
+						recvSize += len(buf)
+						log.Println("RECV BYTE LENGTH: ", len(buf))
+						f.Write(buf)
+					}
+					log.Println("FILE RECEIVED")
+					subftpCon.SendText("HALT")
 				}
 			}
 		}

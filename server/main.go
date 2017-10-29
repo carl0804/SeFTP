@@ -70,25 +70,42 @@ func handleCommand(seftpCon Controller.TCPController, conn net.Conn, plainComman
 					checkerr(err)
 					defer f.Close()
 					fileInfo, err := f.Stat()
-					subFtpCon.SendText(conn, "SIZE " + strconv.FormatInt(fileInfo.Size(),10))
-					result, err := subFtpCon.GetText(conn)
-					checkerr(err)
-					if result == "READY" {
-						for {
-							data := make([]byte, 16)
-							n, err := f.Read(data)
-							if err != nil {
-								if err == io.EOF {
-									break
-								}
-								fmt.Println(err)
-								return
-							}
-							data = data[:n]
-							log.Println("Data:", string(data))
+					fileSize := int(fileInfo.Size())
+					subFtpCon.SendText(conn, "SIZE " + strconv.Itoa(fileSize))
+					//result, err := subFtpCon.GetText(conn)
+					//checkerr(err)
+					//if result == "READY" {
+					//	log.Println("CLIENT READY")
+					sendSize := 0
+					for sendSize < fileSize{
+						result, err := subFtpCon.GetText(conn)
+						checkerr(err)
+						if result == "READY" {
+							log.Println("CLIENT RECV PACKET SUCCEED")
 						}
+						data := make([]byte, 16)
+						n, err := f.Read(data)
+						if err != nil {
+							if err == io.EOF {
+								break
+							}
+							fmt.Println(err)
+							return
+						}
+						data = data[:n]
+						//log.Println("Data:", string(data))
+						subFtpCon.SendByte(conn, data)
+						sendSize += n
 					}
-				} else {
+						log.Println("FILE READ COMPLETE")
+						result, err := subFtpCon.GetText(conn)
+						checkerr(err)
+						if result == "HALT" {
+							log.Println("TRANSFER COMPLETE")
+						} else {
+							log.Println("TRANSFER FAILED: ", result)
+						}
+					} else {
 					subFtpCon.SendText(conn, "UNKNOWN COMMAND")
 				}
 			}
