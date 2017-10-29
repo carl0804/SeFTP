@@ -11,7 +11,7 @@ import (
 	"./Controller"
 	"os"
 	"log"
-	"bufio"
+	//"bufio"
 )
 
 type Config struct {
@@ -50,21 +50,48 @@ func GetOpenPort() int {
 	return addr.(*net.TCPAddr).Port
 }
 
-func handleCommand(seftpCon Controller.SeFTPController, conn net.Conn, plainCommand string) {
+func handleCommand(seftpCon Controller.TCPController, conn net.Conn, plainCommand string) {
 	command := strings.Fields(plainCommand)
 	switch command[0] {
 	case "GET":
 		if _, err := os.Stat(string(command[1])); !os.IsNotExist(err) {
 			subPort := GetOpenPort()
-			subFtpCon := Controller.SubFTPController{ServerAddr: SeFTPConfig.ServerAddr+":"+strconv.Itoa(subPort), Passwd:SeFTPConfig.Passwd}
+			subFtpCon := Controller.TCPController{ServerAddr: SeFTPConfig.ServerAddr+":"+strconv.Itoa(subPort), Passwd:SeFTPConfig.Passwd}
 			subFtpCon.EstabListener()
 			seftpCon.SendText(conn, "PASV PORT "+strconv.Itoa(subPort))
-			f, err := os.Open(string(command[1]))
-			checkerr(err)
-			fileReader := bufio.NewReader(f)
-			fileBuffer, err := fileReader.Peek(1024)
-			checkerr(err)
-			log.Println("Got File: ", string(fileBuffer))
+			for {
+				// Get net.TCPConn object
+				conn, err := subFtpCon.Listener.Accept()
+				checkerr(err)
+				plainEcho, err := subFtpCon.GetText(conn)
+				checkerr(err)
+				if plainEcho == "FILE SIZE" {
+					f, err := os.Open(string(command[1]))
+					checkerr(err)
+					defer f.Close()
+					fileInfo, err := f.Stat()
+					subFtpCon.SendText(conn, "SIZE " + strconv.FormatInt(fileInfo.Size(),10))
+					result, err := subFtpCon.GetText(conn)
+					checkerr(err)
+					if result == "READY" {
+						for {
+							data := make([]byte, 16)
+							n, err := f.Read(data)
+							if err != nil {
+								if err == io.EOF {
+									break
+								}
+								fmt.Println(err)
+								return
+							}
+							data = data[:n]
+							log.Println("Data:", string(data))
+						}
+					}
+				} else {
+					subFtpCon.SendText(conn, "UNKNOWN COMMAND")
+				}
+			}
 		} else {
 			seftpCon.SendText(conn, "FILE NOT EXIST")
 		}
@@ -74,7 +101,7 @@ func handleCommand(seftpCon Controller.SeFTPController, conn net.Conn, plainComm
 	}
 }
 
-func handleConnection(seftpCon Controller.SeFTPController, conn net.Conn) {
+func handleConnection(seftpCon Controller.TCPController, conn net.Conn) {
 	log.Println("Handling new connection...")
 
 	// Close connection when this function ends
@@ -110,7 +137,7 @@ func handleConnection(seftpCon Controller.SeFTPController, conn net.Conn) {
 
 func main() {
 	SeFTPConfig.Parse()
-	seftpCon := Controller.SeFTPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + strconv.Itoa(SeFTPConfig.ServerPort), Passwd: SeFTPConfig.Passwd}
+	seftpCon := Controller.TCPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + strconv.Itoa(SeFTPConfig.ServerPort), Passwd: SeFTPConfig.Passwd}
 	seftpCon.EstabListener()
 
 	defer func() {

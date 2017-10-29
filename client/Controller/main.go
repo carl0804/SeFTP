@@ -9,119 +9,77 @@ import (
 	"crypto/rand"
 )
 
-type SeFTPController struct {
+type TCPController struct {
 	ServerAddr string
 	Conn       net.Conn
 	Passwd     [32]byte
 }
 
-func (seftpCon *SeFTPController) EstabConn() {
-	conn, err := net.Dial("tcp", seftpCon.ServerAddr)
+func (tcpCon *TCPController) EstabConn() {
+	conn, err := net.Dial("tcp", tcpCon.ServerAddr)
 	if err != nil {
 		panic(err)
 	}
-	seftpCon.Conn = conn
+	tcpCon.Conn = conn
 	log.Println("Conn Established.")
 }
 
-func (seftpCon *SeFTPController) CloseConn() {
-	seftpCon.Conn.Close()
+func (tcpCon *TCPController) CloseConn() {
+	tcpCon.Conn.Close()
 	fmt.Println("Dial closed.")
 }
 
-func (seftpCon *SeFTPController) SendText(text string) {
+func (tcpCon *TCPController) SendByte(data []byte) {
 	nonce := make([]byte, 12)
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		panic(err.Error())
 	}
 
-	encByte := GCMEncrypter([]byte(text), seftpCon.Passwd, nonce)
-	//encLength := GCMEncrypter(strconv.Itoa(len(encByte)), "AES256Key-32Characters1234567890", nonce)
-	//fmt.Println("Nonce:", nonce)
+	encByte := GCMEncrypter(data, tcpCon.Passwd, nonce)
 	bs := make([]byte, 2)
 	binary.LittleEndian.PutUint16(bs, uint16(len(encByte)))
-	//fmt.Println("Length:", bs)
-	//fmt.Println("Data:", encByte)
 	finalPac := append(append(nonce, bs...), encByte...)
-	seftpCon.Conn.Write(finalPac)
+	tcpCon.Conn.Write(finalPac)
 }
 
-func (seftpCon *SeFTPController) GetText() (string, error) {
+func (tcpCon *TCPController) GetByte() ([]byte, error) {
 	buf := make([]byte, 4096)
-	_, rErr := seftpCon.Conn.Read(buf)
+	_, rErr := tcpCon.Conn.Read(buf)
 
 	if rErr == nil {
-		//fmt.Println(buf[:])
 		nonce, buf := buf[:12], buf[12:]
-		//fmt.Println("Nonce:", nonce)
 		lth, buf := buf[:2], buf[2:]
 		length := binary.LittleEndian.Uint16(lth)
-		//fmt.Println("Length:", length)
 		data, buf := buf[:length], buf[length:]
-		//fmt.Println("Data:", data)
-		//fmt.Println("Remain:", buf)
-		decData := GCMDecrypter(data, seftpCon.Passwd, nonce)
-		//fmt.Println("Package Length:", rLen)
-		//fmt.Println("decData:", string(decData))
-		return string(decData), nil
+		decData := GCMDecrypter(data, tcpCon.Passwd, nonce)
+		return decData, nil
 	}
-	return "", rErr
+	return nil, rErr
 }
 
-type SubFTPController struct {
-	ServerAddr string
-	Conn       net.Conn
-	Passwd     [32]byte
-}
-
-func (subftpCon *SubFTPController) EstabConn() {
-	conn, err := net.Dial("tcp", subftpCon.ServerAddr)
-	if err != nil {
-		panic(err)
-	}
-	subftpCon.Conn = conn
-	log.Println("Conn Established.")
-}
-
-func (subftpCon *SubFTPController) CloseConn() {
-	subftpCon.Conn.Close()
-	fmt.Println("Dial closed.")
-}
-
-func (subftpCon *SubFTPController) SendText(text string) {
+func (tcpCon *TCPController) SendText(text string) {
 	nonce := make([]byte, 12)
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		panic(err.Error())
 	}
 
-	encByte := GCMEncrypter([]byte(text), subftpCon.Passwd, nonce)
-	//encLength := GCMEncrypter(strconv.Itoa(len(encByte)), "AES256Key-32Characters1234567890", nonce)
-	//fmt.Println("Nonce:", nonce)
+	encByte := GCMEncrypter([]byte(text), tcpCon.Passwd, nonce)
 	bs := make([]byte, 2)
 	binary.LittleEndian.PutUint16(bs, uint16(len(encByte)))
-	//fmt.Println("Length:", bs)
-	//fmt.Println("Data:", encByte)
 	finalPac := append(append(nonce, bs...), encByte...)
-	subftpCon.Conn.Write(finalPac)
+	tcpCon.Conn.Write(finalPac)
 }
 
-func (subftpCon *SubFTPController) GetText() (string, error) {
+func (tcpCon *TCPController) GetText() (string, error) {
 	buf := make([]byte, 4096)
-	_, rErr := subftpCon.Conn.Read(buf)
+	_, rErr := tcpCon.Conn.Read(buf)
 
 	if rErr == nil {
-		//fmt.Println(buf[:])
 		nonce, buf := buf[:12], buf[12:]
-		//fmt.Println("Nonce:", nonce)
 		lth, buf := buf[:2], buf[2:]
 		length := binary.LittleEndian.Uint16(lth)
-		//fmt.Println("Length:", length)
 		data, buf := buf[:length], buf[length:]
-		//fmt.Println("Data:", data)
-		//fmt.Println("Remain:", buf)
-		decData := GCMDecrypter(data, subftpCon.Passwd, nonce)
-		//fmt.Println("Package Length:", rLen)
-		//fmt.Println("decData:", string(decData))
+		decData := GCMDecrypter(data, tcpCon.Passwd, nonce)
 		return string(decData), nil
 	}
 	return "", rErr

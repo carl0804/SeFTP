@@ -9,6 +9,7 @@ import (
 	"./Controller"
 	"net"
 	"log"
+	"strings"
 )
 
 type Config struct {
@@ -49,7 +50,7 @@ func GetOpenPort() int {
 
 func main() {
 	SeFTPConfig.Parse()
-	seftpCon := Controller.SeFTPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + strconv.Itoa(SeFTPConfig.ServerPort), Passwd: SeFTPConfig.Passwd}
+	seftpCon := Controller.TCPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + strconv.Itoa(SeFTPConfig.ServerPort), Passwd: SeFTPConfig.Passwd}
 	seftpCon.EstabConn()
 
 	defer func() {
@@ -64,9 +65,27 @@ func main() {
 
 		seftpCon.SendText(text)
 
-		command, rErr := seftpCon.GetText()
+		plainCommand, rErr := seftpCon.GetText()
 		if rErr == nil {
-			log.Println("Response From Server:", command)
+			log.Println("Response From Server:", plainCommand)
+			command := strings.Fields(plainCommand)
+			switch command[0] {
+			case "PASV":
+				subftpCon := Controller.TCPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + command[2], Passwd: SeFTPConfig.Passwd}
+				subftpCon.EstabConn()
+				defer func() {
+					subftpCon.CloseConn()
+				}()
+				subftpCon.SendText("FILE SIZE")
+				plainCommand, err := subftpCon.GetText()
+				checkerr(err)
+				command := strings.Fields(plainCommand)
+				switch command[0] {
+				case "SIZE":
+					log.Println("FILE SIZE: ", command[1])
+					subftpCon.SendText("READY")
+				}
+			}
 		}
 	}
 }
