@@ -10,6 +10,8 @@ import (
 	"strings"
 	"./Controller"
 	"os"
+	"log"
+	"bufio"
 )
 
 type Config struct {
@@ -34,6 +36,12 @@ func (config *Config) Parse() {
 
 var SeFTPConfig = Config{}
 
+func checkerr(e error) {
+	if e != nil {
+		log.Println(e)
+	}
+}
+
 func GetOpenPort() int {
 	laddr := net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0}
 	listener, _ := net.ListenTCP("tcp4", &laddr)
@@ -51,6 +59,12 @@ func handleCommand(seftpCon Controller.SeFTPController, conn net.Conn, plainComm
 			subFtpCon := Controller.SubFTPController{ServerAddr: SeFTPConfig.ServerAddr+":"+strconv.Itoa(subPort), Passwd:SeFTPConfig.Passwd}
 			subFtpCon.EstabListener()
 			seftpCon.SendText(conn, "PASV PORT "+strconv.Itoa(subPort))
+			f, err := os.Open(string(command[1]))
+			checkerr(err)
+			fileReader := bufio.NewReader(f)
+			fileBuffer, err := fileReader.Peek(1024)
+			checkerr(err)
+			log.Println("Got File: ", string(fileBuffer))
 		} else {
 			seftpCon.SendText(conn, "FILE NOT EXIST")
 		}
@@ -61,11 +75,11 @@ func handleCommand(seftpCon Controller.SeFTPController, conn net.Conn, plainComm
 }
 
 func handleConnection(seftpCon Controller.SeFTPController, conn net.Conn) {
-	fmt.Println("Handling new connection...")
+	log.Println("Handling new connection...")
 
 	// Close connection when this function ends
 	defer func() {
-		fmt.Println("Closing connection...")
+		log.Println("Closing connection...")
 		conn.Close()
 	}()
 
@@ -73,13 +87,13 @@ func handleConnection(seftpCon Controller.SeFTPController, conn net.Conn) {
 		text, rErr := seftpCon.GetText(conn)
 
 		if rErr == nil {
-			fmt.Println("Got Command:", text)
+			log.Println("Got Command:", text)
 			handleCommand(seftpCon, conn, text)
 			continue
 		}
 
 		if rErr == io.EOF {
-			fmt.Println("END OF LINE.")
+			log.Println("END OF LINE.")
 
 			break
 		}
@@ -106,10 +120,7 @@ func main() {
 	for {
 		// Get net.TCPConn object
 		conn, err := seftpCon.Listener.Accept()
-		if err != nil {
-			fmt.Println(err)
-			break
-		}
+		checkerr(err)
 
 		go handleConnection(seftpCon, conn)
 	}

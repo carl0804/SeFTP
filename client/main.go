@@ -8,6 +8,7 @@ import (
 	"bufio"
 	"./Controller"
 	"net"
+	"log"
 )
 
 type Config struct {
@@ -32,6 +33,12 @@ func (config *Config) Parse() {
 
 var SeFTPConfig = Config{}
 
+func checkerr(e error) {
+	if e != nil {
+		log.Println(e)
+	}
+}
+
 func GetOpenPort() int {
 	laddr := net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0}
 	listener, _ := net.ListenTCP("tcp4", &laddr)
@@ -53,13 +60,13 @@ func main() {
 		reader := bufio.NewReader(os.Stdin)
 		fmt.Print("Enter text: ")
 		text, _ := reader.ReadString('\n')
-		//fmt.Println(text)
+		//log.Println(text)
 
 		seftpCon.SendText(text)
 
 		command, rErr := seftpCon.GetText()
 		if rErr == nil {
-			fmt.Println("Response From Server:", command)
+			log.Println("Response From Server:", command)
 		}
 	}
 }
