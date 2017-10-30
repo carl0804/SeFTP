@@ -74,9 +74,9 @@ func main() {
 			case "PASV":
 				subftpCon := Controller.TCPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + command[2], Passwd: SeFTPConfig.Passwd}
 				subftpCon.EstabConn()
-				defer func() {
-					subftpCon.CloseConn()
-				}()
+				//defer func() {
+				//	subftpCon.CloseConn()
+				//}()
 				subftpCon.SendText("FILE SIZE")
 				plainCommand, err := subftpCon.GetText()
 				checkerr(err)
@@ -96,7 +96,11 @@ func main() {
 					for recvSize < fileSize{
 						subftpCon.SendText("READY")
 						buf, err := subftpCon.GetByte()
-						checkerr(err)
+						if err != nil {
+							log.Println("ERR: ", err.Error())
+							subftpCon.SendText("REPEAT")
+							continue
+						}
 						recvSize += len(buf)
 						log.Println("RECV BYTE LENGTH: ", len(buf))
 						f.Write(buf)

@@ -18,7 +18,7 @@ type TCPController struct {
 func (tcpCon *TCPController) EstabConn() {
 	conn, err := net.Dial("tcp", tcpCon.ServerAddr)
 	if err != nil {
-		panic(err)
+		log.Println(err)
 	}
 	tcpCon.Conn = conn
 	log.Println("Conn Established.")
@@ -32,7 +32,7 @@ func (tcpCon *TCPController) CloseConn() {
 func (tcpCon *TCPController) SendByte(data []byte) {
 	nonce := make([]byte, 12)
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		panic(err.Error())
+		log.Println(err.Error())
 	}
 
 	encByte := GCMEncrypter(data, tcpCon.Passwd, nonce)
@@ -43,16 +43,39 @@ func (tcpCon *TCPController) SendByte(data []byte) {
 }
 
 func (tcpCon *TCPController) GetByte() ([]byte, error) {
-	buf := make([]byte, 4096)
-	_, rErr := tcpCon.Conn.Read(buf)
+	buf := make([]byte, 65550)
+	rLen := 0
+	n, rErr := tcpCon.Conn.Read(buf)
+	buf = buf[:n]
+	log.Println("Package Length Received: ", n)
+	rLen += n
 
 	if rErr == nil {
-		nonce, buf := buf[:12], buf[12:]
-		lth, buf := buf[:2], buf[2:]
+		lth := buf[12:14]
+		//log.Println(lth)
 		length := binary.LittleEndian.Uint16(lth)
+		log.Println("Package Length Defined: ", length)
+		for {
+			if rLen < int(length)+14 {
+				subbuf := make([]byte, 65550)
+				n, rErr := tcpCon.Conn.Read(subbuf)
+				subbuf = subbuf[:n]
+				if rErr == nil {
+					log.Println("Package Length Received: ", n)
+					buf = append(buf, subbuf...)
+					rLen += n
+				}
+				continue
+			} else {
+				log.Println("RECV PACKAGE COMPLETE")
+				break
+			}
+		}
+		//log.Println("BUF: ", buf)
+		nonce, buf := buf[:12], buf[14:]
 		data, buf := buf[:length], buf[length:]
-		decData := GCMDecrypter(data, tcpCon.Passwd, nonce)
-		return decData, nil
+		decData, err := GCMDecrypter(data, tcpCon.Passwd, nonce)
+		return decData, err
 	}
 	return nil, rErr
 }
@@ -60,7 +83,7 @@ func (tcpCon *TCPController) GetByte() ([]byte, error) {
 func (tcpCon *TCPController) SendText(text string) {
 	nonce := make([]byte, 12)
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		panic(err.Error())
+		log.Println(err.Error())
 	}
 
 	encByte := GCMEncrypter([]byte(text), tcpCon.Passwd, nonce)
@@ -79,8 +102,8 @@ func (tcpCon *TCPController) GetText() (string, error) {
 		lth, buf := buf[:2], buf[2:]
 		length := binary.LittleEndian.Uint16(lth)
 		data, buf := buf[:length], buf[length:]
-		decData := GCMDecrypter(data, tcpCon.Passwd, nonce)
-		return string(decData), nil
+		decData, err := GCMDecrypter(data, tcpCon.Passwd, nonce)
+		return string(decData), err
 	}
 	return "", rErr
 }

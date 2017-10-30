@@ -77,13 +77,18 @@ func handleCommand(seftpCon Controller.TCPController, conn net.Conn, plainComman
 					//if result == "READY" {
 					//	log.Println("CLIENT READY")
 					sendSize := 0
+					data := make([]byte, 65535)
 					for sendSize < fileSize{
 						result, err := subFtpCon.GetText(conn)
 						checkerr(err)
 						if result == "READY" {
-							log.Println("CLIENT RECV PACKET SUCCEED")
+							log.Println("CLIENT READY")
+						} else if result == "REPEAT" {
+							log.Println("CLIENT REQUEST PACKAGE RESENT")
+							subFtpCon.SendByte(conn, data)
+							continue
 						}
-						data := make([]byte, 16)
+						data := make([]byte, 65535)
 						n, err := f.Read(data)
 						if err != nil {
 							if err == io.EOF {
