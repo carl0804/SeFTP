@@ -77,7 +77,7 @@ func handleCommand(seftpCon Controller.TCPController, conn net.Conn, plainComman
 					//if result == "READY" {
 					//	log.Println("CLIENT READY")
 					sendSize := 0
-					data := make([]byte, 65535)
+					data := make([]byte, 60000)
 					for sendSize < fileSize{
 						result, err := subFtpCon.GetText(conn)
 						checkerr(err)
@@ -88,7 +88,7 @@ func handleCommand(seftpCon Controller.TCPController, conn net.Conn, plainComman
 							subFtpCon.SendByte(conn, data)
 							continue
 						}
-						data := make([]byte, 65535)
+						data := make([]byte, 60000)
 						n, err := f.Read(data)
 						if err != nil {
 							if err == io.EOF {
