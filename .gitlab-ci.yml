@@ -1,7 +1,7 @@
 image: golang:1.9
 
 variables:
-  REPO_NAME: gitlab.com/hazystudio/PaperCraft-microAPI
+  REPO_NAME: gitlab.com/clover/SeFTP
 
 before_script:
   - go version
