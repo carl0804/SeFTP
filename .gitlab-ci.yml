@@ -1,0 +1,34 @@
+image: golang:1.9
+
+variables:
+  REPO_NAME: gitlab.com/hazystudio/PaperCraft-microAPI
+
+before_script:
+  - go version
+  - echo $CI_BUILD_REF
+  - echo $CI_PROJECT_DIR
+
+stages:
+  - test
+  - build
+
+test-project:
+  stage: test
+  script:
+    - mkdir -p $GOPATH/src/$REPO_NAME
+    - mv $CI_PROJECT_DIR/* $GOPATH/src/$REPO_NAME
+    - cd $GOPATH/src/$REPO_NAME/server
+    - go test $(go list ./... | grep -v /vendor/)
+    - cd $GOPATH/src/$REPO_NAME/client
+    - go test $(go list ./... | grep -v /vendor/)
+
+build-project:
+  stage: build
+  script:
+    - mkdir -p $GOPATH/src/$REPO_NAME
+    - mv $CI_PROJECT_DIR/* $GOPATH/src/$REPO_NAME/
+    - mkdir -p $CI_PROJECT_DIR/artifacts
+    - cd $GOPATH/src/$REPO_NAME/server
+    - go build
+    - cd $GOPATH/src/$REPO_NAME/client
+    - go build
