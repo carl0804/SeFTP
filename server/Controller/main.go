@@ -1,17 +1,16 @@
 package Controller
 
 import (
-	"net"
-	"log"
-	"fmt"
-	"io"
-	"encoding/binary"
 	"crypto/rand"
+	"encoding/binary"
+	"io"
+	"log"
+	"net"
 )
 
 type TCPController struct {
 	ServerAddr string
-	Listener       net.Listener
+	Listener   net.Listener
 	Passwd     [32]byte
 }
 
@@ -26,7 +25,7 @@ func (tcpCon *TCPController) EstabListener() {
 
 func (tcpCon *TCPController) CloseListener() {
 	tcpCon.Listener.Close()
-	fmt.Println("Listener closed.")
+	log.Println("Listener closed.")
 }
 
 func (tcpCon *TCPController) SendByte(conn net.Conn, data []byte) {

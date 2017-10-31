@@ -1,12 +1,11 @@
 package Controller
 
 import (
-	"net"
-	"log"
-	"fmt"
-	"io"
-	"encoding/binary"
 	"crypto/rand"
+	"encoding/binary"
+	"io"
+	"log"
+	"net"
 )
 
 type TCPController struct {
@@ -26,7 +25,7 @@ func (tcpCon *TCPController) EstabConn() {
 
 func (tcpCon *TCPController) CloseConn() {
 	tcpCon.Conn.Close()
-	fmt.Println("Dial closed.")
+	log.Println("Dial closed.")
 }
 
 func (tcpCon *TCPController) SendByte(data []byte) {

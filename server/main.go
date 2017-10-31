@@ -2,15 +2,15 @@ package main
 
 import (
 	"fmt"
-	"net"
 	"io"
+	"net"
 	//"encoding/hex"
+	"./Controller"
 	"flag"
+	"log"
+	"os"
 	"strconv"
 	"strings"
-	"./Controller"
-	"os"
-	"log"
 	//"bufio"
 )
 
@@ -56,8 +56,9 @@ func handleCommand(seftpCon Controller.TCPController, conn net.Conn, plainComman
 	case "GET":
 		if _, err := os.Stat(string(command[1])); !os.IsNotExist(err) {
 			subPort := GetOpenPort()
-			subFtpCon := Controller.TCPController{ServerAddr: SeFTPConfig.ServerAddr+":"+strconv.Itoa(subPort), Passwd:SeFTPConfig.Passwd}
+			subFtpCon := Controller.TCPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + strconv.Itoa(subPort), Passwd: SeFTPConfig.Passwd}
 			subFtpCon.EstabListener()
+			defer subFtpCon.CloseListener()
 			seftpCon.SendText(conn, "PASV PORT "+strconv.Itoa(subPort))
 			for {
 				// Get net.TCPConn object
@@ -71,22 +72,26 @@ func handleCommand(seftpCon Controller.TCPController, conn net.Conn, plainComman
 					defer f.Close()
 					fileInfo, err := f.Stat()
 					fileSize := int(fileInfo.Size())
-					subFtpCon.SendText(conn, "SIZE " + strconv.Itoa(fileSize))
+					subFtpCon.SendText(conn, "SIZE "+strconv.Itoa(fileSize))
 					//result, err := subFtpCon.GetText(conn)
 					//checkerr(err)
 					//if result == "READY" {
 					//	log.Println("CLIENT READY")
 					sendSize := 0
 					data := make([]byte, 60000)
-					for sendSize < fileSize{
+					for sendSize < fileSize {
 						result, err := subFtpCon.GetText(conn)
 						checkerr(err)
 						if result == "READY" {
 							log.Println("CLIENT READY")
 						} else if result == "REPEAT" {
 							log.Println("CLIENT REQUEST PACKAGE RESENT")
-							subFtpCon.SendByte(conn, data)
-							continue
+							result, err := subFtpCon.GetText(conn)
+							checkerr(err)
+							if result == "READY" {
+								subFtpCon.SendByte(conn, data)
+								continue
+							}
 						}
 						data := make([]byte, 60000)
 						n, err := f.Read(data)
@@ -94,7 +99,7 @@ func handleCommand(seftpCon Controller.TCPController, conn net.Conn, plainComman
 							if err == io.EOF {
 								break
 							}
-							fmt.Println(err)
+							log.Println(err)
 							return
 						}
 						data = data[:n]
@@ -102,22 +107,34 @@ func handleCommand(seftpCon Controller.TCPController, conn net.Conn, plainComman
 						subFtpCon.SendByte(conn, data)
 						sendSize += n
 					}
-						log.Println("FILE READ COMPLETE")
-						result, err := subFtpCon.GetText(conn)
-						checkerr(err)
-						if result == "HALT" {
-							log.Println("TRANSFER COMPLETE")
-						} else {
-							log.Println("TRANSFER FAILED: ", result)
-						}
+					log.Println("FILE READ COMPLETE")
+					result, err := subFtpCon.GetText(conn)
+					checkerr(err)
+					if result == "HALT" {
+						log.Println("TRANSFER COMPLETE")
+						break
 					} else {
+						log.Println("TRANSFER FAILED: ", result)
+					}
+				} else {
 					subFtpCon.SendText(conn, "UNKNOWN COMMAND")
 				}
 			}
+			log.Println("CLOSE SUBCONN")
+			return
 		} else {
 			seftpCon.SendText(conn, "FILE NOT EXIST")
 		}
 		seftpCon.SendText(conn, "")
+	case "CD":
+		newPath := command[1]
+		err := os.Chdir(newPath)
+		checkerr(err)
+		if err == nil {
+			seftpCon.SendText(conn, "DIR CHANGED")
+		} else {
+			seftpCon.SendText(conn, "DIR CHANGE FAILED")
+		}
 	default:
 		seftpCon.SendText(conn, "UNKNOWN COMMAND")
 	}

@@ -1,14 +1,14 @@
 package main
 
 import (
-	"fmt"
-	"strconv"
-	"flag"
-	"os"
-	"bufio"
 	"./Controller"
-	"net"
+	"bufio"
+	"flag"
+	"fmt"
 	"log"
+	"net"
+	"os"
+	"strconv"
 	"strings"
 	//"io"
 )
@@ -93,7 +93,7 @@ func main() {
 					checkerr(err)
 					defer f.Close()
 					recvSize := 0
-					for recvSize < fileSize{
+					for recvSize < fileSize {
 						subftpCon.SendText("READY")
 						buf, err := subftpCon.GetByte()
 						if err != nil {
@@ -107,6 +107,7 @@ func main() {
 					}
 					log.Println("FILE RECEIVED")
 					subftpCon.SendText("HALT")
+					continue
 				}
 			}
 		}
