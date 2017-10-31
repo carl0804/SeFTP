@@ -54,9 +54,7 @@ func main() {
 	seftpCon := Controller.TCPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + strconv.Itoa(SeFTPConfig.ServerPort), Passwd: SeFTPConfig.Passwd}
 	seftpCon.EstabConn()
 
-	defer func() {
-		seftpCon.CloseConn()
-	}()
+	defer seftpCon.CloseConn()
 
 	for {
 		reader := bufio.NewReader(os.Stdin)
@@ -74,9 +72,7 @@ func main() {
 			case "PASV":
 				subftpCon := Controller.TCPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + command[2], Passwd: SeFTPConfig.Passwd}
 				subftpCon.EstabConn()
-				//defer func() {
-				//	subftpCon.CloseConn()
-				//}()
+				defer subftpCon.CloseConn()
 				subftpCon.SendText("FILE SIZE")
 				plainCommand, err := subftpCon.GetText()
 				checkerr(err)

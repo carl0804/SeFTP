@@ -179,9 +179,7 @@ func main() {
 	seftpCon := Controller.TCPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + strconv.Itoa(SeFTPConfig.ServerPort), Passwd: SeFTPConfig.Passwd}
 	seftpCon.EstabListener()
 
-	defer func() {
-		seftpCon.CloseListener()
-	}()
+	defer seftpCon.CloseListener()
 
 	for {
 		// Get net.TCPConn object
