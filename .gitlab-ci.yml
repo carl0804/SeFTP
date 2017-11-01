@@ -17,7 +17,7 @@ build-project:
     - mkdir -p $GOPATH/src/$REPO_NAME
     - mv $CI_PROJECT_DIR/* $GOPATH/src/$REPO_NAME/
     - mkdir -p $CI_PROJECT_DIR/artifacts
-    - cd $GOPATH/src/$REPO_NAME/server
-    - go build main.go
-    - cd $GOPATH/src/$REPO_NAME/client
-    - go build main.go
+    - cd $GOPATH/src/$REPO_NAME/
+    - go get golang.org/x/crypto/sha3
+    - go get ./...
+    - go build ./...
