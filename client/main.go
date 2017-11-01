@@ -39,18 +39,24 @@ func main() {
 				defer subftpCon.CloseConn()
 				subftpCon.SendText("FILE SIZE")
 				plainCommand, err := subftpCon.GetText()
-				checkerr(err)
+				if !checkerr(err) {
+					continue
+				}
 				command := strings.Fields(plainCommand)
 				switch command[0] {
 				case "SIZE":
 					fileSize, err := strconv.Atoi(command[1])
-					checkerr(err)
+					if !checkerr(err) {
+						continue
+					}
 					log.Println("FILE SIZE: ", fileSize)
 					reader := bufio.NewReader(os.Stdin)
 					fmt.Print("Enter File Name: ")
 					fileName, _ := reader.ReadString('\n')
 					f, err := os.Create(strings.Fields(fileName)[0])
-					checkerr(err)
+					if !checkerr(err) {
+						continue
+					}
 					defer f.Close()
 					recvSize := 0
 					for recvSize < fileSize {
