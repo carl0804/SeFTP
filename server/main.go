@@ -25,88 +25,179 @@ func handleCommand(seftpCon Controller.TCPController, stream *smux.Stream, plain
 			if !checkerr(err) {
 				return
 			}
-			subFtpCon := Controller.TCPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + strconv.Itoa(subPort), Passwd: SeFTPConfig.Passwd}
-			subFtpCon.EstabListener()
-			defer subFtpCon.CloseListener()
-			seftpCon.SendText(stream, "PASV PORT "+strconv.Itoa(subPort))
-			for {
-				// Get net.TCPConn object
-				subconn, err := subFtpCon.Listener.Accept()
-				if !checkerr(err) {
-					continue
-				}
-				// Setup server side of smux
-				session, err := smux.Server(subconn, nil)
-				if !checkerr(err) {
-					continue
-				}
+			if (len(command) <= 2) || (command[2] == "TCP") {
+				subFtpCon := Controller.TCPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + strconv.Itoa(subPort), Passwd: SeFTPConfig.Passwd}
+				subFtpCon.EstabListener()
+				defer subFtpCon.CloseListener()
 
-				// Accept a stream
-				substream, err := session.AcceptStream()
-				if !checkerr(err) {
-					continue
-				}
-				plainEcho, err := subFtpCon.GetText(substream)
-				if !checkerr(err) {
-					continue
-				}
-				if plainEcho == "FILE SIZE" {
-					f, err := os.Open(string(command[1]))
+				seftpCon.SendText(stream, "PASV TCP "+strconv.Itoa(subPort))
+				for {
+					// Get net.TCPConn object
+					subconn, err := subFtpCon.Listener.Accept()
 					if !checkerr(err) {
 						continue
 					}
-					defer f.Close()
-					fileInfo, err := f.Stat()
+					// Setup server side of smux
+					session, err := smux.Server(subconn, nil)
 					if !checkerr(err) {
 						continue
 					}
-					fileSize := int(fileInfo.Size())
-					subFtpCon.SendText(substream, "SIZE "+strconv.Itoa(fileSize))
-					//result, err := subFtpCon.GetText(conn)
-					//checkerr(err)
-					//if result == "READY" {
-					//	log.Println("CLIENT READY")
-					sendSize := 0
-					result, err := subFtpCon.GetText(substream)
+
+					// Accept a stream
+					substream, err := session.AcceptStream()
 					if !checkerr(err) {
 						continue
 					}
-					if result == "READY" {
-						log.Println("CLIENT READY")
-						for sendSize < fileSize {
-							data := make([]byte, 60000)
-							n, err := f.Read(data)
-							if err != nil {
-								if err == io.EOF {
-									break
-								}
-								log.Println(err)
-								return
-							}
-							data = data[:n]
-							//log.Println("Data:", string(data))
-							subFtpCon.SendByte(substream, data)
-							sendSize += n
-							time.Sleep(time.Microsecond)
+					plainEcho, err := subFtpCon.GetText(substream)
+					if !checkerr(err) {
+						continue
+					}
+					if plainEcho == "FILE SIZE" {
+						f, err := os.Open(string(command[1]))
+						if !checkerr(err) {
+							continue
 						}
-					}
-					log.Println("FILE READ COMPLETE")
-					result, err = subFtpCon.GetText(substream)
-					if !checkerr(err) {
-						break
-					}
-					if result == "HALT" {
-						log.Println("TRANSFER COMPLETE")
-						break
+						defer f.Close()
+						fileInfo, err := f.Stat()
+						if !checkerr(err) {
+							continue
+						}
+						fileSize := int(fileInfo.Size())
+						subFtpCon.SendText(substream, "SIZE "+strconv.Itoa(fileSize))
+						//result, err := subFtpCon.GetText(conn)
+						//checkerr(err)
+						//if result == "READY" {
+						//	log.Println("CLIENT READY")
+						sendSize := 0
+						result, err := subFtpCon.GetText(substream)
+						if !checkerr(err) {
+							continue
+						}
+						if result == "READY" {
+							log.Println("CLIENT READY")
+							for sendSize < fileSize {
+								data := make([]byte, 60000)
+								n, err := f.Read(data)
+								if err != nil {
+									if err == io.EOF {
+										break
+									}
+									log.Println(err)
+									return
+								}
+								data = data[:n]
+								//log.Println("Data:", string(data))
+								subFtpCon.SendByte(substream, data)
+								sendSize += n
+								time.Sleep(time.Microsecond)
+							}
+						}
+						log.Println("FILE READ COMPLETE")
+						result, err = subFtpCon.GetText(substream)
+						if !checkerr(err) {
+							break
+						}
+						if result == "HALT" {
+							log.Println("TRANSFER COMPLETE")
+							break
+						} else {
+							log.Println("TRANSFER FAILED: ", result)
+						}
 					} else {
-						log.Println("TRANSFER FAILED: ", result)
+						subFtpCon.SendText(substream, "UNKNOWN COMMAND")
 					}
-				} else {
-					subFtpCon.SendText(substream, "UNKNOWN COMMAND")
 				}
+				log.Println("CLOSE SUBCONN")
+				return
+			} else if command[2] == "UDP" {
+				subFtpCon := Controller.KCPController{ServerAddr: ":" + strconv.Itoa(subPort), Passwd: SeFTPConfig.Passwd}
+				subFtpCon.EstabListener()
+				defer subFtpCon.CloseListener()
+
+				seftpCon.SendText(stream, "PASV UDP "+strconv.Itoa(subPort))
+				for {
+					subconn, err := subFtpCon.Listener.AcceptKCP()
+					if !checkerr(err) {
+						continue
+					}
+					subconn.SetStreamMode(true)
+					subconn.SetWriteDelay(true)
+					subconn.SetNoDelay(0, 40, 2, 1)
+					subconn.SetWindowSize(1024, 1024)
+					subconn.SetMtu(1350)
+					// Setup server side of smux
+					session, err := smux.Server(subconn, nil)
+					if !checkerr(err) {
+						continue
+					}
+
+					// Accept a stream
+					substream, err := session.AcceptStream()
+					if !checkerr(err) {
+						continue
+					}
+					plainEcho, err := subFtpCon.GetText(substream)
+					if !checkerr(err) {
+						continue
+					}
+					if plainEcho == "FILE SIZE" {
+						f, err := os.Open(string(command[1]))
+						if !checkerr(err) {
+							continue
+						}
+						defer f.Close()
+						fileInfo, err := f.Stat()
+						if !checkerr(err) {
+							continue
+						}
+						fileSize := int(fileInfo.Size())
+						subFtpCon.SendText(substream, "SIZE "+strconv.Itoa(fileSize))
+						//result, err := subFtpCon.GetText(conn)
+						//checkerr(err)
+						//if result == "READY" {
+						//	log.Println("CLIENT READY")
+						sendSize := 0
+						result, err := subFtpCon.GetText(substream)
+						if !checkerr(err) {
+							continue
+						}
+						if result == "READY" {
+							log.Println("CLIENT READY")
+							for sendSize < fileSize {
+								data := make([]byte, 60000)
+								n, err := f.Read(data)
+								if err != nil {
+									if err == io.EOF {
+										break
+									}
+									log.Println(err)
+									return
+								}
+								data = data[:n]
+								//log.Println("Data:", string(data))
+								subFtpCon.SendByte(substream, data)
+								sendSize += n
+								time.Sleep(time.Microsecond)
+							}
+						}
+						log.Println("FILE READ COMPLETE")
+						result, err = subFtpCon.GetText(substream)
+						if !checkerr(err) {
+							break
+						}
+						if result == "HALT" {
+							log.Println("TRANSFER COMPLETE")
+							break
+						} else {
+							log.Println("TRANSFER FAILED: ", result)
+						}
+					} else {
+						subFtpCon.SendText(substream, "UNKNOWN COMMAND")
+					}
+				}
+				log.Println("CLOSE SUBCONN")
+				return
 			}
-			log.Println("CLOSE SUBCONN")
-			return
 		} else {
 			seftpCon.SendText(stream, "FILE NOT EXIST")
 		}
