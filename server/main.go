@@ -1,21 +1,22 @@
 package main
 
 import (
-	"gitlab.com/clover/SeFTP/server/Controller"
+	"./Controller"
 	"fmt"
 	"io"
-	"net"
 	//"encoding/hex"
 	"log"
 	"os"
 	"strconv"
 	"strings"
 	//"bufio"
+	"github.com/xtaci/smux"
+	"time"
 )
 
 var SeFTPConfig = Config{}
 
-func handleCommand(seftpCon Controller.TCPController, conn net.Conn, plainCommand string) {
+func handleCommand(seftpCon Controller.TCPController, stream *smux.Stream, plainCommand string) {
 	command := strings.Fields(plainCommand)
 	switch command[0] {
 	case "GET":
@@ -27,14 +28,25 @@ func handleCommand(seftpCon Controller.TCPController, conn net.Conn, plainComman
 			subFtpCon := Controller.TCPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + strconv.Itoa(subPort), Passwd: SeFTPConfig.Passwd}
 			subFtpCon.EstabListener()
 			defer subFtpCon.CloseListener()
-			seftpCon.SendText(conn, "PASV PORT "+strconv.Itoa(subPort))
+			seftpCon.SendText(stream, "PASV PORT "+strconv.Itoa(subPort))
 			for {
 				// Get net.TCPConn object
-				conn, err := subFtpCon.Listener.Accept()
+				subconn, err := subFtpCon.Listener.Accept()
 				if !checkerr(err) {
 					continue
 				}
-				plainEcho, err := subFtpCon.GetText(conn)
+				// Setup server side of smux
+				session, err := smux.Server(subconn, nil)
+				if !checkerr(err) {
+					continue
+				}
+
+				// Accept a stream
+				substream, err := session.AcceptStream()
+				if !checkerr(err) {
+					continue
+				}
+				plainEcho, err := subFtpCon.GetText(substream)
 				if !checkerr(err) {
 					continue
 				}
@@ -49,47 +61,37 @@ func handleCommand(seftpCon Controller.TCPController, conn net.Conn, plainComman
 						continue
 					}
 					fileSize := int(fileInfo.Size())
-					subFtpCon.SendText(conn, "SIZE "+strconv.Itoa(fileSize))
+					subFtpCon.SendText(substream, "SIZE "+strconv.Itoa(fileSize))
 					//result, err := subFtpCon.GetText(conn)
 					//checkerr(err)
 					//if result == "READY" {
 					//	log.Println("CLIENT READY")
 					sendSize := 0
-					data := make([]byte, 60000)
-					for sendSize < fileSize {
-						result, err := subFtpCon.GetText(conn)
-						if !checkerr(err) {
-							continue
-						}
-						if result == "READY" {
-							log.Println("CLIENT READY")
-						} else if result == "REPEAT" {
-							log.Println("CLIENT REQUEST PACKAGE RESENT")
-							result, err := subFtpCon.GetText(conn)
-							if !checkerr(err) {
-								continue
+					result, err := subFtpCon.GetText(substream)
+					if !checkerr(err) {
+						continue
+					}
+					if result == "READY" {
+						log.Println("CLIENT READY")
+						for sendSize < fileSize {
+							data := make([]byte, 60000)
+							n, err := f.Read(data)
+							if err != nil {
+								if err == io.EOF {
+									break
+								}
+								log.Println(err)
+								return
 							}
-							if result == "READY" {
-								subFtpCon.SendByte(conn, data)
-								continue
-							}
+							data = data[:n]
+							//log.Println("Data:", string(data))
+							subFtpCon.SendByte(substream, data)
+							sendSize += n
+							time.Sleep(time.Microsecond)
 						}
-						data := make([]byte, 60000)
-						n, err := f.Read(data)
-						if err != nil {
-							if err == io.EOF {
-								break
-							}
-							log.Println(err)
-							return
-						}
-						data = data[:n]
-						//log.Println("Data:", string(data))
-						subFtpCon.SendByte(conn, data)
-						sendSize += n
 					}
 					log.Println("FILE READ COMPLETE")
-					result, err := subFtpCon.GetText(conn)
+					result, err = subFtpCon.GetText(substream)
 					if !checkerr(err) {
 						break
 					}
@@ -100,43 +102,43 @@ func handleCommand(seftpCon Controller.TCPController, conn net.Conn, plainComman
 						log.Println("TRANSFER FAILED: ", result)
 					}
 				} else {
-					subFtpCon.SendText(conn, "UNKNOWN COMMAND")
+					subFtpCon.SendText(substream, "UNKNOWN COMMAND")
 				}
 			}
 			log.Println("CLOSE SUBCONN")
 			return
 		} else {
-			seftpCon.SendText(conn, "FILE NOT EXIST")
+			seftpCon.SendText(stream, "FILE NOT EXIST")
 		}
-		seftpCon.SendText(conn, "")
+		seftpCon.SendText(stream, "")
 	case "CD":
 		newPath := command[1]
 		err := os.Chdir(newPath)
 		if !checkerr(err) {
-			seftpCon.SendText(conn, "DIR CHANGE FAILED")
+			seftpCon.SendText(stream, "DIR CHANGE FAILED")
 		} else {
-			seftpCon.SendText(conn, "DIR CHANGED")
+			seftpCon.SendText(stream, "DIR CHANGED")
 		}
 	default:
-		seftpCon.SendText(conn, "UNKNOWN COMMAND")
+		seftpCon.SendText(stream, "UNKNOWN COMMAND")
 	}
 }
 
-func handleConnection(seftpCon Controller.TCPController, conn net.Conn) {
+func handleConnection(seftpCon Controller.TCPController, stream *smux.Stream) {
 	log.Println("Handling new connection...")
 
 	// Close connection when this function ends
 	defer func() {
 		log.Println("Closing connection...")
-		conn.Close()
+		stream.Close()
 	}()
 
 	for {
-		text, rErr := seftpCon.GetText(conn)
+		text, rErr := seftpCon.GetText(stream)
 
 		if rErr == nil {
 			log.Println("Got Command:", text)
-			handleCommand(seftpCon, conn, text)
+			handleCommand(seftpCon, stream, text)
 			continue
 		}
 
@@ -148,7 +150,7 @@ func handleConnection(seftpCon Controller.TCPController, conn net.Conn) {
 
 		fmt.Errorf(
 			"Error while reading from",
-			conn.RemoteAddr(),
+			stream.RemoteAddr(),
 			":",
 			rErr,
 		)
@@ -169,7 +171,18 @@ func main() {
 		if !checkerr(err) {
 			continue
 		}
+		// Setup server side of smux
+		session, err := smux.Server(conn, nil)
+		if !checkerr(err) {
+			continue
+		}
 
-		go handleConnection(seftpCon, conn)
+		// Accept a stream
+		stream, err := session.AcceptStream()
+		if !checkerr(err) {
+			continue
+		}
+
+		go handleConnection(seftpCon, stream)
 	}
 }

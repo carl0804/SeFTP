@@ -1,7 +1,7 @@
 package main
 
 import (
-	"gitlab.com/clover/SeFTP/client/Controller"
+	"./Controller"
 	"bufio"
 	"fmt"
 	"log"
@@ -59,16 +59,14 @@ func main() {
 					}
 					defer f.Close()
 					recvSize := 0
+					subftpCon.SendText("READY")
+					var exbuf []byte
+					var buf []byte
 					for recvSize < fileSize {
-						subftpCon.SendText("READY")
-						buf, err := subftpCon.GetByte()
-						if err != nil {
-							log.Println("ERR: ", err.Error())
-							subftpCon.SendText("REPEAT")
-							continue
-						}
+						buf, exbuf, err = subftpCon.GetByte(exbuf)
+						checkerr(err)
 						recvSize += len(buf)
-						log.Println("RECV BYTE LENGTH: ", len(buf))
+						//log.Println("RECV BYTE LENGTH: ", len(buf))
 						f.Write(buf)
 					}
 					log.Println("FILE RECEIVED")

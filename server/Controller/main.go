@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"github.com/xtaci/smux"
 )
 
 type TCPController struct {
@@ -28,7 +29,7 @@ func (tcpCon *TCPController) CloseListener() {
 	log.Println("Listener closed.")
 }
 
-func (tcpCon *TCPController) SendByte(conn net.Conn, data []byte) {
+func (tcpCon *TCPController) SendByte(stream *smux.Stream, data []byte) {
 	nonce := make([]byte, 12)
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		log.Println(err.Error())
@@ -38,33 +39,39 @@ func (tcpCon *TCPController) SendByte(conn net.Conn, data []byte) {
 	bs := make([]byte, 2)
 	binary.LittleEndian.PutUint16(bs, uint16(len(encByte)))
 	finalPac := append(append(nonce, bs...), encByte...)
-	conn.Write(finalPac)
+	stream.Write(finalPac)
 }
 
-func (tcpCon *TCPController) GetByte(conn net.Conn) ([]byte, error) {
-	buf := make([]byte, 65550)
+func (tcpCon *TCPController) GetByte(exbuf []byte, stream *smux.Stream) ([]byte, []byte, error) {
+	//log.Println("ExBUF: ", exbuf)
+	tcpbuf := make([]byte, 65550)
 	rLen := 0
-	n, rErr := conn.Read(buf)
-	buf = buf[:n]
-	log.Println("Package Length Received: ", n)
+	n, rErr := stream.Read(tcpbuf)
+	tcpbuf = tcpbuf[:n]
+	buf := append(exbuf, tcpbuf...)
 	rLen += n
+	rLen += len(exbuf)
+	//log.Println("Package Length Received: ", n)
 
 	if rErr == nil {
 		lth := buf[12:14]
 		//log.Println(lth)
 		length := binary.LittleEndian.Uint16(lth)
-		log.Println("Package Length Defined: ", length)
+		//log.Println("Package Length Defined: ", length)
 		for {
 			if rLen < int(length)+14 {
 				subbuf := make([]byte, 65550)
-				n, rErr := conn.Read(subbuf)
+				n, rErr := stream.Read(subbuf)
 				subbuf = subbuf[:n]
 				if rErr == nil {
-					log.Println("Package Length Received: ", n)
+					//log.Println("Package Length Received: ", n)
 					buf = append(buf, subbuf...)
 					rLen += n
 				}
 				continue
+			} else if rLen > int(length)+14 {
+				log.Println("RECV EXCESSIVE PACKAGE")
+				break
 			} else {
 				log.Println("RECV PACKAGE COMPLETE")
 				break
@@ -74,12 +81,15 @@ func (tcpCon *TCPController) GetByte(conn net.Conn) ([]byte, error) {
 		nonce, buf := buf[:12], buf[14:]
 		data, buf := buf[:length], buf[length:]
 		decData, err := GCMDecrypter(data, tcpCon.Passwd, nonce)
-		return decData, err
+		if len(buf) == 0 {
+			return decData, nil, err
+		}
+		return decData, buf, err
 	}
-	return nil, rErr
+	return nil, nil, rErr
 }
 
-func (tcpCon *TCPController) SendText(conn net.Conn, text string) {
+func (tcpCon *TCPController) SendText(stream *smux.Stream, text string) {
 	nonce := make([]byte, 12)
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		log.Println(err.Error())
@@ -89,12 +99,12 @@ func (tcpCon *TCPController) SendText(conn net.Conn, text string) {
 	bs := make([]byte, 2)
 	binary.LittleEndian.PutUint16(bs, uint16(len(encByte)))
 	finalPac := append(append(nonce, bs...), encByte...)
-	conn.Write(finalPac)
+	stream.Write(finalPac)
 }
 
-func (tcpCon *TCPController) GetText(conn net.Conn) (string, error) {
+func (tcpCon *TCPController) GetText(stream *smux.Stream) (string, error) {
 	buf := make([]byte, 4096)
-	_, rErr := conn.Read(buf)
+	_, rErr := stream.Read(buf)
 
 	if rErr == nil {
 		nonce, buf := buf[:12], buf[12:]
