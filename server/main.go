@@ -210,6 +210,15 @@ func handleCommand(seftpCon Controller.TCPController, stream *smux.Stream, plain
 		} else {
 			seftpCon.SendText(stream, "DIR CHANGED")
 		}
+	case "LS":
+		var list []string
+		if len(command) > 1 {
+			path := command[1]
+			list = Ls(path)
+		} else {
+			list = Ls("")
+		}
+		seftpCon.SendText(stream, strings.Join(list, " | "))
 	default:
 		seftpCon.SendText(stream, "UNKNOWN COMMAND")
 	}

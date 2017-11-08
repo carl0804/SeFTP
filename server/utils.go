@@ -5,6 +5,8 @@ import (
 	"flag"
 	"net"
 	"golang.org/x/crypto/sha3"
+	"strings"
+	"io/ioutil"
 )
 
 type Config struct {
@@ -47,4 +49,23 @@ func GetOpenPort() (int, error) {
 		return addr.(*net.TCPAddr).Port, nil
 	}
 	return 0, err
+}
+
+func IsUpper(str string) bool {
+	return str == strings.ToUpper(str)
+}
+
+func Ls(path string) []string {
+	if path == "" {
+		path = "./"
+	}
+	files, err := ioutil.ReadDir(path)
+	checkerr(err)
+
+	var list []string
+
+	for _, f := range files {
+		list = append(list, f.Name())
+	}
+	return list
 }
