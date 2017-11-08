@@ -219,6 +219,17 @@ func handleCommand(seftpCon Controller.TCPController, stream *smux.Stream, plain
 			list = Ls("")
 		}
 		seftpCon.SendText(stream, strings.Join(list, " | "))
+	case "RM":
+		if len(command) > 1 {
+			err := os.Remove(command[1])
+			if !checkerr(err) {
+				seftpCon.SendText(stream, "RM FAILED")
+			} else {
+				seftpCon.SendText(stream, "RM SUCCEEDED")
+			}
+		} else {
+			log.Println("NO SPECIFIC FILE")
+		}
 	default:
 		seftpCon.SendText(stream, "UNKNOWN COMMAND")
 	}
