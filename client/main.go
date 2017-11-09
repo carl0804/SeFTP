@@ -24,6 +24,18 @@ func handleGet(serverCommand []string, clientCommand []string) {
 	}
 }
 
+func handlePost(serverCommand []string, clientCommand []string) {
+	if (len(clientCommand) >= 2) {
+		if (len(clientCommand) <= 2) || (clientCommand[2] == "TCP") {
+			subftpCon := Controller.TCPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + serverCommand[2], Passwd: SeFTPConfig.Passwd}
+			POST(subftpCon)
+		} else if clientCommand[2] == "UDP" {
+			subftpCon := Controller.KCPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + serverCommand[2], Passwd: SeFTPConfig.Passwd}
+			POST(subftpCon)
+		}
+	}
+}
+
 func processRemoteCommand(plainClientCommand string, seftpCon Controller.TCPController) {
 	clientCommand := strings.Fields(plainClientCommand)
 	seftpCon.SendText(plainClientCommand)
@@ -34,6 +46,8 @@ func processRemoteCommand(plainClientCommand string, seftpCon Controller.TCPCont
 	switch clientCommand[0] {
 	case "GET":
 		handleGet(serverCommand, clientCommand)
+	case "POST":
+		handlePost(serverCommand, clientCommand)
 	}
 }
 

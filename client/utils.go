@@ -14,6 +14,8 @@ import (
 	"./Controller"
 	"encoding/binary"
 	"gopkg.in/cheggaaa/pb.v2"
+	"io"
+	"time"
 )
 
 type Config struct {
@@ -175,6 +177,111 @@ func GET(subftpInt interface{}) {
 			log.Println("FILE RECEIVED")
 			subftpCon.SendText("HALT")
 			return
+		}
+	}
+}
+
+func POST(subftpInt interface{}) {
+	fmt.Print("Enter File Name: ")
+	reader := bufio.NewReader(os.Stdin)
+	fileName, _ := reader.ReadString('\n')
+	f, err := os.Open(strings.Fields(fileName)[0])
+	if !checkerr(err) {
+		return
+	}
+	defer f.Close()
+	fileInfo, err := f.Stat()
+	if !checkerr(err) {
+		return
+	}
+	fileSize := int(fileInfo.Size())
+	if subftpCon, ok := subftpInt.(Controller.TCPController); ok {
+		log.Println("TCP Controller")
+		subftpCon.EstabConn()
+		defer subftpCon.CloseConn()
+
+		log.Println("File size: ", fileSize)
+
+		subftpCon.SendText("SIZE " + strconv.Itoa(fileSize))
+
+		sendSize := 0
+		result, err := subftpCon.GetText()
+		if !checkerr(err) {
+			return
+		}
+		if result == "READY" {
+			log.Println("Server ready")
+			for sendSize < fileSize {
+				data := make([]byte, 60000)
+				n, err := f.Read(data)
+				if err != nil {
+					if err == io.EOF {
+						break
+					}
+					log.Println(err)
+					return
+				}
+				data = data[:n]
+				//log.Println("Data:", string(data))
+				subftpCon.SendByte(data)
+				sendSize += n
+				time.Sleep(time.Microsecond)
+			}
+			log.Println("FILE READ COMPLETE")
+			result, err = subftpCon.GetText()
+			if !checkerr(err) {
+				return
+			}
+			if result == "HALT" {
+				log.Println("TRANSFER COMPLETE")
+				return
+			} else {
+				log.Println("TRANSFER FAILED: ", result)
+			}
+		}
+	} else if subftpCon, ok := subftpInt.(Controller.KCPController); ok {
+		log.Println("KCP Controller")
+		subftpCon.EstabConn()
+		defer subftpCon.CloseConn()
+
+		log.Println("File size: ", fileSize)
+
+		subftpCon.SendText("SIZE " + strconv.Itoa(fileSize))
+
+		sendSize := 0
+		result, err := subftpCon.GetText()
+		if !checkerr(err) {
+			return
+		}
+		if result == "READY" {
+			log.Println("Server ready")
+			for sendSize < fileSize {
+				data := make([]byte, 60000)
+				n, err := f.Read(data)
+				if err != nil {
+					if err == io.EOF {
+						break
+					}
+					log.Println(err)
+					return
+				}
+				data = data[:n]
+				//log.Println("Data:", string(data))
+				subftpCon.SendByte(data)
+				sendSize += n
+				time.Sleep(time.Microsecond)
+			}
+			log.Println("FILE READ COMPLETE")
+			result, err = subftpCon.GetText()
+			if !checkerr(err) {
+				return
+			}
+			if result == "HALT" {
+				log.Println("TRANSFER COMPLETE")
+				return
+			} else {
+				log.Println("TRANSFER FAILED: ", result)
+			}
 		}
 	}
 }

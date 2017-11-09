@@ -202,6 +202,130 @@ func handleCommand(seftpCon Controller.TCPController, stream *smux.Stream, plain
 			seftpCon.SendText(stream, "FILE NOT EXIST")
 		}
 		seftpCon.SendText(stream, "")
+	case "POST":
+		subPort, err := GetOpenPort()
+		if !checkerr(err) {
+			return
+		}
+		filePath := string(command[1])
+		if (len(command) <= 2) || (command[2] == "TCP") {
+			subFtpCon := Controller.TCPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + strconv.Itoa(subPort), Passwd: SeFTPConfig.Passwd}
+			subFtpCon.EstabListener()
+			defer subFtpCon.CloseListener()
+
+			seftpCon.SendText(stream, "PASV TCP "+strconv.Itoa(subPort))
+			for {
+				// Get net.TCPConn object
+				subconn, err := subFtpCon.Listener.Accept()
+				if !checkerr(err) {
+					continue
+				}
+				// Setup server side of smux
+				session, err := smux.Server(subconn, nil)
+				if !checkerr(err) {
+					continue
+				}
+
+				// Accept a stream
+				substream, err := session.AcceptStream()
+				if !checkerr(err) {
+					continue
+				}
+				log.Println("ACCEPT SUBSTREAM")
+				plainEcho, err := subFtpCon.GetText(substream)
+				if !checkerr(err) {
+					continue
+				}
+				echo := strings.Fields(plainEcho)
+				log.Println("ECHO: ", plainEcho)
+				if (echo[0] != "SIZE") || (len(echo) != 2) {
+					continue
+				}
+				fileSize, err := strconv.Atoi(echo[1])
+				if !checkerr(err) {
+					continue
+				}
+				f, err := os.Create(strings.Fields(filePath)[0])
+				if !checkerr(err) {
+					continue
+				}
+				defer f.Close()
+				recvSize := 0
+				subFtpCon.SendText(substream, "READY")
+
+				var exbuf []byte
+				var buf []byte
+				for recvSize < fileSize {
+					buf, exbuf, err = subFtpCon.GetByte(exbuf, substream)
+					checkerr(err)
+					recvSize += len(buf)
+					//log.Println("RECV BYTE LENGTH: ", len(buf))
+					f.Write(buf)
+				}
+				log.Println("FILE RECEIVED")
+				subFtpCon.SendText(substream, "HALT")
+				return
+			}
+		} else if command[2] == "UDP" {
+			subFtpCon := Controller.KCPController{ServerAddr: ":" + strconv.Itoa(subPort), Passwd: SeFTPConfig.Passwd}
+			subFtpCon.EstabListener()
+			defer subFtpCon.CloseListener()
+
+			seftpCon.SendText(stream, "PASV UDP "+strconv.Itoa(subPort))
+			for {
+				// Get net.TCPConn object
+				subconn, err := subFtpCon.Listener.Accept()
+				if !checkerr(err) {
+					continue
+				}
+				// Setup server side of smux
+				session, err := smux.Server(subconn, nil)
+				if !checkerr(err) {
+					continue
+				}
+
+				// Accept a stream
+				substream, err := session.AcceptStream()
+				if !checkerr(err) {
+					continue
+				}
+				log.Println("ACCEPT SUBSTREAM")
+				plainEcho, err := subFtpCon.GetText(substream)
+				if !checkerr(err) {
+					continue
+				}
+				echo := strings.Fields(plainEcho)
+				log.Println("ECHO: ", plainEcho)
+				if (echo[0] != "SIZE") || (len(echo) != 2) {
+					continue
+				}
+				fileSize, err := strconv.Atoi(echo[1])
+				if !checkerr(err) {
+					continue
+				}
+				f, err := os.Create(strings.Fields(filePath)[0])
+				if !checkerr(err) {
+					continue
+				}
+				defer f.Close()
+				recvSize := 0
+				subFtpCon.SendText(substream, "READY")
+
+				var exbuf []byte
+				var buf []byte
+				for recvSize < fileSize {
+					buf, exbuf, err = subFtpCon.GetByte(exbuf, substream)
+					checkerr(err)
+					recvSize += len(buf)
+					//log.Println("RECV BYTE LENGTH: ", len(buf))
+					f.Write(buf)
+				}
+				log.Println("FILE RECEIVED")
+				subFtpCon.SendText(substream, "HALT")
+				return
+			}
+		}
+
 	case "CD":
 		newPath := command[1]
 		err := os.Chdir(newPath)
