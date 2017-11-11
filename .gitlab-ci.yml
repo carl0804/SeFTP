@@ -19,5 +19,10 @@ build-project:
     - mkdir -p $CI_PROJECT_DIR/artifacts
     - cd $GOPATH/src/$REPO_NAME/
     - go get golang.org/x/crypto/sha3
-    - go get ./...
-    - go build ./...
+    - go get gopkg.in/cheggaaa/pb.v2
+    - go get github.com/xtaci/smux
+    - go get github.com/xtaci/kcp-go
+    - cd $GOPATH/src/$REPO_NAME/client
+    - go build
+    - cd $GOPATH/src/$REPO_NAME/server
+    - go build
