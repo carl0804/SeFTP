@@ -1,51 +1,97 @@
 package main
 
 import (
-	"fmt"
-	"strconv"
-	"flag"
-	"os"
-	"bufio"
 	"./Controller"
-	"net"
+	"bufio"
+	"fmt"
 	"log"
+	"os"
+	"strconv"
 	"strings"
 )
 
-type Config struct {
-	ServerAddr string
-	Passwd     [32]byte
-	ServerPort int
-}
-
-func (config *Config) Parse() {
-	serverAddr := flag.String("s", "127.0.0.1", "Server IP Address")
-	serverPort := flag.Int("p", 9080, "Server Port")
-	plainPasswd := flag.String("k", "WELCOMETOTHEGRID", "Password")
-	flag.Parse()
-
-	var passwd [32]byte
-	copy(passwd[:], *plainPasswd)
-
-	config.ServerAddr = *serverAddr
-	config.ServerPort = *serverPort
-	config.Passwd = passwd
-}
-
 var SeFTPConfig = Config{}
 
-func checkerr(e error) {
-	if e != nil {
-		log.Println(e)
+func handleGet(serverCommand []string, clientCommand []string) {
+	if  serverCommand[0] != "FILE" {
+		if (len(clientCommand) <= 2) || (clientCommand[2] == "TCP") {
+			subftpCon := Controller.TCPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + serverCommand[2], Passwd: SeFTPConfig.Passwd}
+			GET(subftpCon)
+		} else if clientCommand[2] == "UDP" {
+			subftpCon := Controller.KCPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + serverCommand[2], Passwd: SeFTPConfig.Passwd}
+			GET(subftpCon)
+		}
 	}
 }
 
-func GetOpenPort() int {
-	laddr := net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0}
-	listener, _ := net.ListenTCP("tcp4", &laddr)
-	addr := listener.Addr()
-	listener.Close()
-	return addr.(*net.TCPAddr).Port
+func handlePost(serverCommand []string, clientCommand []string) {
+	if (len(clientCommand) >= 2) {
+		if (len(clientCommand) <= 2) || (clientCommand[2] == "TCP") {
+			subftpCon := Controller.TCPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + serverCommand[2], Passwd: SeFTPConfig.Passwd}
+			POST(subftpCon)
+		} else if clientCommand[2] == "UDP" {
+			subftpCon := Controller.KCPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + serverCommand[2], Passwd: SeFTPConfig.Passwd}
+			POST(subftpCon)
+		}
+	}
+}
+
+func processRemoteCommand(plainClientCommand string, seftpCon Controller.TCPController) {
+	clientCommand := strings.Fields(plainClientCommand)
+	seftpCon.SendText(plainClientCommand)
+	plainServerCommand, rErr := seftpCon.GetText()
+	checkerr(rErr)
+	serverCommand := strings.Fields(plainServerCommand)
+	log.Println("Response From Server:", plainServerCommand)
+	switch clientCommand[0] {
+	case "GET":
+		handleGet(serverCommand, clientCommand)
+	case "POST":
+		handlePost(serverCommand, clientCommand)
+	}
+}
+
+func processLocalCommand(plainClientCommand string) {
+	clientCommand := strings.Fields(plainClientCommand)
+	switch clientCommand[0] {
+	case "cd":
+		newPath := clientCommand[1]
+		err := os.Chdir(newPath)
+		if !checkerr(err) {
+			log.Println("Dir change failed")
+		} else {
+			log.Println("Dir changed")
+		}
+	case "ls":
+		var list []string
+		if len(clientCommand) > 1 {
+			path := clientCommand[1]
+			list = Ls(path)
+		} else {
+			list = Ls("")
+		}
+		log.Println(strings.Join(list, " | "))
+	case "rm":
+		if len(clientCommand) > 1 {
+			err := os.Remove(clientCommand[1])
+			checkerr(err)
+		} else {
+			log.Println("No specific file")
+		}
+	case "exit":
+		log.Println("Exit SeFTP")
+		os.Exit(0)
+	default:
+		log.Println("Unknown command")
+	}
+}
+
+func processCommand(plainClientCommand string, seftpCon Controller.TCPController) {
+	if IsUpper(strings.Fields(plainClientCommand)[0]) {
+		processRemoteCommand(plainClientCommand, seftpCon)
+	} else {
+		processLocalCommand(plainClientCommand)
+	}
 }
 
 func main() {
@@ -53,39 +99,13 @@ func main() {
 	seftpCon := Controller.TCPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + strconv.Itoa(SeFTPConfig.ServerPort), Passwd: SeFTPConfig.Passwd}
 	seftpCon.EstabConn()
 
-	defer func() {
-		seftpCon.CloseConn()
-	}()
+	defer seftpCon.CloseConn()
 
 	for {
 		reader := bufio.NewReader(os.Stdin)
 		fmt.Print("Enter text: ")
 		text, _ := reader.ReadString('\n')
 		//log.Println(text)
-
-		seftpCon.SendText(text)
-
-		plainCommand, rErr := seftpCon.GetText()
-		if rErr == nil {
-			log.Println("Response From Server:", plainCommand)
-			command := strings.Fields(plainCommand)
-			switch command[0] {
-			case "PASV":
-				subftpCon := Controller.TCPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + command[2], Passwd: SeFTPConfig.Passwd}
-				subftpCon.EstabConn()
-				defer func() {
-					subftpCon.CloseConn()
-				}()
-				subftpCon.SendText("FILE SIZE")
-				plainCommand, err := subftpCon.GetText()
-				checkerr(err)
-				command := strings.Fields(plainCommand)
-				switch command[0] {
-				case "SIZE":
-					log.Println("FILE SIZE: ", command[1])
-					subftpCon.SendText("READY")
-				}
-			}
-		}
+		processCommand(text, seftpCon)
 	}
 }
