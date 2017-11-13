@@ -16,6 +16,7 @@ import (
 	"gopkg.in/cheggaaa/pb.v2"
 	"io"
 	"time"
+	"encoding/hex"
 )
 
 type Config struct {
@@ -302,4 +303,21 @@ func POST(subftpInt interface{}) {
 			}
 		}
 	}
+}
+
+func SHA3FileHash(filePath string) (result string, err error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return
+	}
+	defer file.Close()
+
+	hash := sha3.New256()
+	_, err = io.Copy(hash, file)
+	if err != nil {
+		return
+	}
+
+	result = hex.EncodeToString(hash.Sum(nil))
+	return
 }

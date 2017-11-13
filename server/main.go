@@ -375,6 +375,14 @@ func handleCommand(seftpCon Controller.TCPController, stream *smux.Stream, plain
 		} else {
 			log.Println("NO SPECIFIC FILE")
 		}
+	case "SHA3SUM":
+		if len(command) > 1 {
+			sum, err := SHA3FileHash(command[1])
+			checkerr(err)
+			seftpCon.SendText(stream, sum)
+		} else {
+			seftpCon.SendText(stream, "No specific file")
+		}
 	default:
 		seftpCon.SendText(stream, "UNKNOWN COMMAND")
 	}
