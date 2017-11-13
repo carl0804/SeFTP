@@ -78,6 +78,14 @@ func processLocalCommand(plainClientCommand string) {
 		} else {
 			log.Println("No specific file")
 		}
+	case "sha3sum":
+		if len(clientCommand) > 1 {
+			sum, err := SHA3FileHash(clientCommand[1])
+			checkerr(err)
+			log.Println(sum)
+		} else {
+			log.Println("No specific file")
+		}
 	case "exit":
 		log.Println("Exit SeFTP")
 		os.Exit(0)

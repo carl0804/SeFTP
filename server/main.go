@@ -12,6 +12,7 @@ import (
 	//"bufio"
 	"github.com/xtaci/smux"
 	"time"
+	"encoding/binary"
 )
 
 var SeFTPConfig = Config{}
@@ -255,12 +256,22 @@ func handleCommand(seftpCon Controller.TCPController, stream *smux.Stream, plain
 
 				var exbuf []byte
 				var buf []byte
-				for recvSize < fileSize {
+				for recvSize+len(exbuf) < fileSize {
 					buf, exbuf, err = subFtpCon.GetByte(exbuf, substream)
 					checkerr(err)
 					recvSize += len(buf)
 					//log.Println("RECV BYTE LENGTH: ", len(buf))
 					f.Write(buf)
+				}
+				if recvSize < fileSize {
+					lth := exbuf[12:14]
+					//log.Println(lth)
+					length := binary.LittleEndian.Uint16(lth)
+					nonce, exbuf := exbuf[:12], exbuf[14:]
+					data, exbuf := exbuf[:length], exbuf[length:]
+					decData, err := Controller.GCMDecrypter(data, SeFTPConfig.Passwd, nonce)
+					checkerr(err)
+					f.Write(decData)
 				}
 				log.Println("FILE RECEIVED")
 				subFtpCon.SendText(substream, "HALT")
@@ -313,12 +324,22 @@ func handleCommand(seftpCon Controller.TCPController, stream *smux.Stream, plain
 
 				var exbuf []byte
 				var buf []byte
-				for recvSize < fileSize {
+				for recvSize+len(exbuf) < fileSize {
 					buf, exbuf, err = subFtpCon.GetByte(exbuf, substream)
 					checkerr(err)
 					recvSize += len(buf)
 					//log.Println("RECV BYTE LENGTH: ", len(buf))
 					f.Write(buf)
+				}
+				if recvSize < fileSize {
+					lth := exbuf[12:14]
+					//log.Println(lth)
+					length := binary.LittleEndian.Uint16(lth)
+					nonce, exbuf := exbuf[:12], exbuf[14:]
+					data, exbuf := exbuf[:length], exbuf[length:]
+					decData, err := Controller.GCMDecrypter(data, SeFTPConfig.Passwd, nonce)
+					checkerr(err)
+					f.Write(decData)
 				}
 				log.Println("FILE RECEIVED")
 				subFtpCon.SendText(substream, "HALT")
@@ -353,6 +374,14 @@ func handleCommand(seftpCon Controller.TCPController, stream *smux.Stream, plain
 			}
 		} else {
 			log.Println("NO SPECIFIC FILE")
+		}
+	case "SHA3SUM":
+		if len(command) > 1 {
+			sum, err := SHA3FileHash(command[1])
+			checkerr(err)
+			seftpCon.SendText(stream, sum)
+		} else {
+			seftpCon.SendText(stream, "No specific file")
 		}
 	default:
 		seftpCon.SendText(stream, "UNKNOWN COMMAND")
