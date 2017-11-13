@@ -108,11 +108,10 @@ func GET(subftpInt interface{}) {
 			subftpCon.SendText("READY")
 
 			progressBar := pb.ProgressBarTemplate(`{{bar . | green}} {{speed . | blue }}`).Start(fileSize)
-			defer progressBar.Finish()
 
 			var exbuf []byte
 			var buf []byte
-			for recvSize < fileSize {
+			for recvSize+len(exbuf) < fileSize {
 				buf, exbuf, err = subftpCon.GetByte(exbuf)
 				checkerr(err)
 				recvSize += len(buf)
@@ -120,6 +119,18 @@ func GET(subftpInt interface{}) {
 				//log.Println("RECV BYTE LENGTH: ", len(buf))
 				f.Write(buf)
 			}
+			if recvSize < fileSize {
+				lth := exbuf[12:14]
+				//log.Println(lth)
+				length := binary.LittleEndian.Uint16(lth)
+				nonce, exbuf := exbuf[:12], exbuf[14:]
+				data, exbuf := exbuf[:length], exbuf[length:]
+				decData, err := Controller.GCMDecrypter(data, SeFTPConfig.Passwd, nonce)
+				checkerr(err)
+				progressBar.Add(len(exbuf))
+				f.Write(decData)
+			}
+			progressBar.Finish()
 			log.Println("FILE RECEIVED")
 			subftpCon.SendText("HALT")
 			return
@@ -152,7 +163,6 @@ func GET(subftpInt interface{}) {
 			subftpCon.SendText("READY")
 
 			progressBar := pb.ProgressBarTemplate(`{{bar . | green}} {{speed . | blue }}`).Start(fileSize)
-			defer progressBar.Finish()
 
 			var exbuf []byte
 			var buf []byte
@@ -172,8 +182,10 @@ func GET(subftpInt interface{}) {
 				data, exbuf := exbuf[:length], exbuf[length:]
 				decData, err := Controller.GCMDecrypter(data, SeFTPConfig.Passwd, nonce)
 				checkerr(err)
+				progressBar.Add(len(exbuf))
 				f.Write(decData)
 			}
+			progressBar.Finish()
 			log.Println("FILE RECEIVED")
 			subftpCon.SendText("HALT")
 			return
@@ -211,6 +223,7 @@ func POST(subftpInt interface{}) {
 		}
 		if result == "READY" {
 			log.Println("Server ready")
+			progressBar := pb.ProgressBarTemplate(`{{bar . | green}} {{speed . | blue }}`).Start(fileSize)
 			for sendSize < fileSize {
 				data := make([]byte, 60000)
 				n, err := f.Read(data)
@@ -225,8 +238,10 @@ func POST(subftpInt interface{}) {
 				//log.Println("Data:", string(data))
 				subftpCon.SendByte(data)
 				sendSize += n
+				progressBar.Add(n)
 				time.Sleep(time.Microsecond)
 			}
+			progressBar.Finish()
 			log.Println("FILE READ COMPLETE")
 			result, err = subftpCon.GetText()
 			if !checkerr(err) {
@@ -255,6 +270,7 @@ func POST(subftpInt interface{}) {
 		}
 		if result == "READY" {
 			log.Println("Server ready")
+			progressBar := pb.ProgressBarTemplate(`{{bar . | green}} {{speed . | blue }}`).Start(fileSize)
 			for sendSize < fileSize {
 				data := make([]byte, 60000)
 				n, err := f.Read(data)
@@ -269,8 +285,10 @@ func POST(subftpInt interface{}) {
 				//log.Println("Data:", string(data))
 				subftpCon.SendByte(data)
 				sendSize += n
+				progressBar.Add(n)
 				time.Sleep(time.Microsecond)
 			}
+			progressBar.Finish()
 			log.Println("FILE READ COMPLETE")
 			result, err = subftpCon.GetText()
 			if !checkerr(err) {
