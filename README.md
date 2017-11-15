@@ -1,4 +1,4 @@
-# SeFTP | [![pipeline status](https://gitlab.com/clover/SeFTP/badges/Development/pipeline.svg)](https://gitlab.com/clover/SeFTP/commits/Development)
+# SeFTP | [![pipeline status](https://gitlab.com/clover/SeFTP/badges/Development/pipeline.svg)](https://gitlab.com/clover/SeFTP/commits/Development) | [![Go Report Card](https://goreportcard.com/badge/gitlab.com/clover/SeFTP)](https://goreportcard.com/report/gitlab.com/clover/SeFTP)
 
 SeFTP is a fast, secure and reliable file transfer protocol written in Golang.
 
