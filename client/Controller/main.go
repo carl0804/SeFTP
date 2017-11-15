@@ -137,7 +137,7 @@ func (tcpCon *TCPController) GetText() (string, error) {
 		nonce, buf := buf[:12], buf[12:]
 		lth, buf := buf[:2], buf[2:]
 		length := binary.LittleEndian.Uint16(lth)
-		data, buf := buf[:length], buf[length:]
+		data, _ := buf[:length], buf[length:]
 		decData, err := GCMDecrypter(data, tcpCon.Passwd, nonce)
 		return string(decData), err
 	}
@@ -275,7 +275,7 @@ func (kcpCon *KCPController) GetText() (string, error) {
 		nonce, buf := buf[:12], buf[12:]
 		lth, buf := buf[:2], buf[2:]
 		length := binary.LittleEndian.Uint16(lth)
-		data, buf := buf[:length], buf[length:]
+		data, _ := buf[:length], buf[length:]
 		decData, err := GCMDecrypter(data, kcpCon.Passwd, nonce)
 		return string(decData), err
 	}

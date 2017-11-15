@@ -27,7 +27,7 @@ func (tcpCon *TCPController) EstabListener() {
 	log.Println("Listener Established.")
 }
 
-//CloseConn is a function to close TCP listener.
+//CloseListener is a function to close TCP listener.
 func (tcpCon *TCPController) CloseListener() {
 	tcpCon.Listener.Close()
 	log.Println("Listener closed.")
@@ -118,7 +118,7 @@ func (tcpCon *TCPController) GetText(stream *smux.Stream) (string, error) {
 		nonce, buf := buf[:12], buf[12:]
 		lth, buf := buf[:2], buf[2:]
 		length := binary.LittleEndian.Uint16(lth)
-		data, buf := buf[:length], buf[length:]
+		data, _ := buf[:length], buf[length:]
 		decData, err := GCMDecrypter(data, tcpCon.Passwd, nonce)
 		return string(decData), err
 	}
@@ -132,7 +132,7 @@ type KCPController struct {
 	Passwd     [32]byte
 }
 
-//EstabConn is a function to establish a listener.
+//EstabListener is a function to establish a listener.
 func (kcpCon *KCPController) EstabListener() {
 	ln, err := kcp.ListenWithOptions(kcpCon.ServerAddr, nil, 10, 3)
 	if err != nil {
@@ -142,7 +142,7 @@ func (kcpCon *KCPController) EstabListener() {
 	log.Println("Listener Established.")
 }
 
-//CloseConn is a function to close KCP connection.
+//CloseListener is a function to close KCP connection.
 func (kcpCon *KCPController) CloseListener() {
 	kcpCon.Listener.Close()
 	log.Println("Listener closed.")
@@ -233,7 +233,7 @@ func (kcpCon *KCPController) GetText(stream *smux.Stream) (string, error) {
 		nonce, buf := buf[:12], buf[12:]
 		lth, buf := buf[:2], buf[2:]
 		length := binary.LittleEndian.Uint16(lth)
-		data, buf := buf[:length], buf[length:]
+		data, _ := buf[:length], buf[length:]
 		decData, err := GCMDecrypter(data, kcpCon.Passwd, nonce)
 		return string(decData), err
 	}
