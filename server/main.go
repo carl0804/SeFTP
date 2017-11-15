@@ -2,7 +2,6 @@ package main
 
 import (
 	"./Controller"
-	"fmt"
 	"io"
 	//"encoding/hex"
 	"log"
@@ -10,9 +9,9 @@ import (
 	"strconv"
 	"strings"
 	//"bufio"
+	"encoding/binary"
 	"github.com/xtaci/smux"
 	"time"
-	"encoding/binary"
 )
 
 var SeFTPConfig = Config{}
@@ -411,13 +410,6 @@ func handleConnection(seftpCon Controller.TCPController, stream *smux.Stream) {
 
 			break
 		}
-
-		fmt.Errorf(
-			"Error while reading from",
-			stream.RemoteAddr(),
-			":",
-			rErr,
-		)
 		break
 	}
 }

@@ -6,9 +6,8 @@ import (
 	"log"
 )
 
+//GCMEncrypter is a function to encrypt data using AES-GCM
 func GCMEncrypter(data []byte, key [32]byte, nonce []byte) []byte {
-	// The key argument should be the AES key, either 16 or 32 bytes
-	// to select AES-128 or AES-256.
 	block, err := aes.NewCipher(key[:])
 	if err != nil {
 		log.Println(err.Error())
@@ -23,10 +22,8 @@ func GCMEncrypter(data []byte, key [32]byte, nonce []byte) []byte {
 	return ciphertext
 }
 
+//GCMDecrypter is a function to decipher data using AES-GCM
 func GCMDecrypter(encData []byte, key [32]byte, nonce []byte) ([]byte, error) {
-	// The key argument should be the AES key, either 16 or 32 bytes
-	// to select AES-128 or AES-256.
-
 	block, err := aes.NewCipher(key[:])
 	if err != nil {
 		log.Println(err.Error())
@@ -40,5 +37,4 @@ func GCMDecrypter(encData []byte, key [32]byte, nonce []byte) ([]byte, error) {
 	plaintext, err := aesgcm.Open(nil, nonce, encData, nil)
 
 	return plaintext, err
-	// Output: exampleplaintext
 }

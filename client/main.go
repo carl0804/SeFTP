@@ -13,7 +13,7 @@ import (
 var SeFTPConfig = Config{}
 
 func handleGet(serverCommand []string, clientCommand []string) {
-	if  serverCommand[0] != "FILE" {
+	if serverCommand[0] != "FILE" {
 		if (len(clientCommand) <= 2) || (clientCommand[2] == "TCP") {
 			subftpCon := Controller.TCPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + serverCommand[2], Passwd: SeFTPConfig.Passwd}
 			GET(subftpCon)
@@ -25,7 +25,7 @@ func handleGet(serverCommand []string, clientCommand []string) {
 }
 
 func handlePost(serverCommand []string, clientCommand []string) {
-	if (len(clientCommand) >= 2) {
+	if len(clientCommand) >= 2 {
 		if (len(clientCommand) <= 2) || (clientCommand[2] == "TCP") {
 			subftpCon := Controller.TCPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + serverCommand[2], Passwd: SeFTPConfig.Passwd}
 			POST(subftpCon)
