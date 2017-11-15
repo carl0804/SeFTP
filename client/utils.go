@@ -1,30 +1,32 @@
 package main
 
 import (
-	"golang.org/x/crypto/sha3"
-	"flag"
-	"log"
-	"net"
-	"strings"
-	"io/ioutil"
-	"bufio"
-	"os"
-	"fmt"
-	"strconv"
 	"./Controller"
+	"bufio"
 	"encoding/binary"
+	"encoding/hex"
+	"flag"
+	"fmt"
+	"golang.org/x/crypto/sha3"
 	"gopkg.in/cheggaaa/pb.v2"
 	"io"
+	"io/ioutil"
+	"log"
+	"net"
+	"os"
+	"strconv"
+	"strings"
 	"time"
-	"encoding/hex"
 )
 
+//Config is the config struct for SeFTP.
 type Config struct {
 	ServerAddr string
 	Passwd     [32]byte
 	ServerPort int
 }
 
+//Parse is a function to parse flag config to Config struct.
 func (config *Config) Parse() {
 	serverAddr := flag.String("s", "127.0.0.1", "Server IP Address")
 	serverPort := flag.Int("p", 9080, "Server Port")
@@ -38,10 +40,12 @@ func (config *Config) Parse() {
 	config.Passwd = passwd
 }
 
+//GetSHA3Hash is a function to get SHA3 hash of a string.
 func GetSHA3Hash(text string) [32]byte {
 	return sha3.Sum256([]byte(text))
 }
 
+//checkerr is a function to check if there is error.
 func checkerr(e error) bool {
 	if e != nil {
 		log.Println(e)
@@ -50,6 +54,7 @@ func checkerr(e error) bool {
 	return true
 }
 
+//GetOpenPort is a function to get an open TCP port.
 func GetOpenPort() (int, error) {
 	laddr := net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0}
 	listener, err := net.ListenTCP("tcp4", &laddr)
@@ -61,10 +66,12 @@ func GetOpenPort() (int, error) {
 	return 0, err
 }
 
+//IsUpper is a function to determine if string uses uppercase.
 func IsUpper(str string) bool {
 	return str == strings.ToUpper(str)
 }
 
+//Ls is a function to handle LS request.
 func Ls(path string) []string {
 	if path == "" {
 		path = "./"
@@ -80,6 +87,7 @@ func Ls(path string) []string {
 	return list
 }
 
+//Get is a function to handle GET request.
 func GET(subftpInt interface{}) {
 	if subftpCon, ok := subftpInt.(Controller.TCPController); ok {
 		subftpCon.EstabConn()
@@ -194,6 +202,7 @@ func GET(subftpInt interface{}) {
 	}
 }
 
+//POST is a function to handle POST request.
 func POST(subftpInt interface{}) {
 	fmt.Print("Enter File Name: ")
 	reader := bufio.NewReader(os.Stdin)
@@ -305,6 +314,7 @@ func POST(subftpInt interface{}) {
 	}
 }
 
+//SHA3FileHash is a function to get file's SHA3 hash.
 func SHA3FileHash(filePath string) (result string, err error) {
 	file, err := os.Open(filePath)
 	if err != nil {

@@ -3,19 +3,21 @@ package Controller
 import (
 	"crypto/rand"
 	"encoding/binary"
+	"github.com/xtaci/kcp-go"
+	"github.com/xtaci/smux"
 	"io"
 	"log"
 	"net"
-	"github.com/xtaci/smux"
-	"github.com/xtaci/kcp-go"
 )
 
+//TCPController is an interface to control a TCP Dial.
 type TCPController struct {
 	ServerAddr string
 	Listener   net.Listener
 	Passwd     [32]byte
 }
 
+//EstabListener is a function to establish a listener.
 func (tcpCon *TCPController) EstabListener() {
 	ln, err := net.Listen("tcp", tcpCon.ServerAddr)
 	if err != nil {
@@ -25,11 +27,13 @@ func (tcpCon *TCPController) EstabListener() {
 	log.Println("Listener Established.")
 }
 
+//CloseConn is a function to close TCP listener.
 func (tcpCon *TCPController) CloseListener() {
 	tcpCon.Listener.Close()
 	log.Println("Listener closed.")
 }
 
+//SendByte is a function to send byte though TCP socket.
 func (tcpCon *TCPController) SendByte(stream *smux.Stream, data []byte) {
 	nonce := make([]byte, 12)
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
@@ -43,6 +47,7 @@ func (tcpCon *TCPController) SendByte(stream *smux.Stream, data []byte) {
 	stream.Write(finalPac)
 }
 
+//GetByte is a function to get byte though TCP socket.
 func (tcpCon *TCPController) GetByte(exbuf []byte, stream *smux.Stream) ([]byte, []byte, error) {
 	//log.Println("ExBUF: ", exbuf)
 	tcpbuf := make([]byte, 65550)
@@ -90,6 +95,7 @@ func (tcpCon *TCPController) GetByte(exbuf []byte, stream *smux.Stream) ([]byte,
 	return nil, nil, rErr
 }
 
+//SendText is a function to send text though TCP socket.
 func (tcpCon *TCPController) SendText(stream *smux.Stream, text string) {
 	nonce := make([]byte, 12)
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
@@ -103,6 +109,7 @@ func (tcpCon *TCPController) SendText(stream *smux.Stream, text string) {
 	stream.Write(finalPac)
 }
 
+//GetText is a function to get text though TCP socket.
 func (tcpCon *TCPController) GetText(stream *smux.Stream) (string, error) {
 	buf := make([]byte, 4096)
 	_, rErr := stream.Read(buf)
@@ -118,12 +125,14 @@ func (tcpCon *TCPController) GetText(stream *smux.Stream) (string, error) {
 	return "", rErr
 }
 
+//KCPController is an interface to control a KCP Dial.
 type KCPController struct {
 	ServerAddr string
 	Listener   *kcp.Listener
 	Passwd     [32]byte
 }
 
+//EstabConn is a function to establish a listener.
 func (kcpCon *KCPController) EstabListener() {
 	ln, err := kcp.ListenWithOptions(kcpCon.ServerAddr, nil, 10, 3)
 	if err != nil {
@@ -133,11 +142,13 @@ func (kcpCon *KCPController) EstabListener() {
 	log.Println("Listener Established.")
 }
 
+//CloseConn is a function to close KCP connection.
 func (kcpCon *KCPController) CloseListener() {
 	kcpCon.Listener.Close()
 	log.Println("Listener closed.")
 }
 
+//SendByte is a function to send byte though KCP socket.
 func (kcpCon *KCPController) SendByte(stream *smux.Stream, data []byte) {
 	nonce := make([]byte, 12)
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
@@ -151,6 +162,7 @@ func (kcpCon *KCPController) SendByte(stream *smux.Stream, data []byte) {
 	stream.Write(finalPac)
 }
 
+//GetByte is a function to get byte though KCP socket.
 func (kcpCon *KCPController) GetByte(exbuf []byte, stream *smux.Stream) ([]byte, []byte, error) {
 	//log.Println("ExBUF: ", exbuf)
 	tcpbuf := make([]byte, 65550)
@@ -198,6 +210,7 @@ func (kcpCon *KCPController) GetByte(exbuf []byte, stream *smux.Stream) ([]byte,
 	return nil, nil, rErr
 }
 
+//SendText is a function to send text though KCP socket.
 func (kcpCon *KCPController) SendText(stream *smux.Stream, text string) {
 	nonce := make([]byte, 12)
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
@@ -211,6 +224,7 @@ func (kcpCon *KCPController) SendText(stream *smux.Stream, text string) {
 	stream.Write(finalPac)
 }
 
+//GetText is a function to get text though KCP socket.
 func (kcpCon *KCPController) GetText(stream *smux.Stream) (string, error) {
 	buf := make([]byte, 4096)
 	_, rErr := stream.Read(buf)
