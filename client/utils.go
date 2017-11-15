@@ -87,7 +87,7 @@ func Ls(path string) []string {
 	return list
 }
 
-//Get is a function to handle GET request.
+//GET is a function to handle GET request.
 func GET(subftpInt interface{}) {
 	if subftpCon, ok := subftpInt.(Controller.TCPController); ok {
 		subftpCon.EstabConn()
@@ -260,9 +260,8 @@ func POST(subftpInt interface{}) {
 			if result == "HALT" {
 				log.Println("TRANSFER COMPLETE")
 				return
-			} else {
-				log.Println("TRANSFER FAILED: ", result)
 			}
+			log.Println("TRANSFER FAILED: ", result)
 		}
 	} else if subftpCon, ok := subftpInt.(Controller.KCPController); ok {
 		log.Println("KCP Controller")
@@ -307,9 +306,8 @@ func POST(subftpInt interface{}) {
 			if result == "HALT" {
 				log.Println("TRANSFER COMPLETE")
 				return
-			} else {
-				log.Println("TRANSFER FAILED: ", result)
 			}
+			log.Println("TRANSFER FAILED: ", result)
 		}
 	}
 }

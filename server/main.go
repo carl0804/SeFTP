@@ -14,6 +14,7 @@ import (
 	"time"
 )
 
+//SeFTPConfig is a config predefined for convenience.
 var SeFTPConfig = Config{}
 
 func handleCommand(seftpCon Controller.TCPController, stream *smux.Stream, plainCommand string) {
@@ -267,7 +268,7 @@ func handleCommand(seftpCon Controller.TCPController, stream *smux.Stream, plain
 					//log.Println(lth)
 					length := binary.LittleEndian.Uint16(lth)
 					nonce, exbuf := exbuf[:12], exbuf[14:]
-					data, exbuf := exbuf[:length], exbuf[length:]
+					data, _ := exbuf[:length], exbuf[length:]
 					decData, err := Controller.GCMDecrypter(data, SeFTPConfig.Passwd, nonce)
 					checkerr(err)
 					f.Write(decData)
@@ -335,7 +336,7 @@ func handleCommand(seftpCon Controller.TCPController, stream *smux.Stream, plain
 					//log.Println(lth)
 					length := binary.LittleEndian.Uint16(lth)
 					nonce, exbuf := exbuf[:12], exbuf[14:]
-					data, exbuf := exbuf[:length], exbuf[length:]
+					data, _ := exbuf[:length], exbuf[length:]
 					decData, err := Controller.GCMDecrypter(data, SeFTPConfig.Passwd, nonce)
 					checkerr(err)
 					f.Write(decData)

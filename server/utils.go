@@ -85,7 +85,7 @@ func SHA3FileHash(filePath string) (result string, err error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return
-	}//Get is a function to handle GET request.
+	} //Get is a function to handle GET request.
 
 	defer file.Close()
 

@@ -10,6 +10,7 @@ import (
 	"strings"
 )
 
+//SeFTPConfig is a config predefined for convenience.
 var SeFTPConfig = Config{}
 
 func handleGet(serverCommand []string, clientCommand []string) {
