@@ -17,7 +17,7 @@ import (
 //SeFTPConfig is a config predefined for convenience.
 var SeFTPConfig = Config{}
 
-func handleCommand(seftpCon Controller.TCPController, stream *smux.Stream, plainCommand string) {
+func handleCommand(seftpCon Controller.TraController, stream *smux.Stream, plainCommand string) {
 	command := strings.Fields(plainCommand)
 	switch command[0] {
 	case "GET":
@@ -27,28 +27,22 @@ func handleCommand(seftpCon Controller.TCPController, stream *smux.Stream, plain
 				return
 			}
 			if (len(command) <= 2) || (command[2] == "TCP") {
-				subFtpCon := Controller.TCPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + strconv.Itoa(subPort), Passwd: SeFTPConfig.Passwd}
+				subFtpCon := &Controller.TCPController{
+					Controller: Controller.Controller{
+						ServerAddr: SeFTPConfig.ServerAddr + ":" + strconv.Itoa(subPort),
+						Passwd:     SeFTPConfig.Passwd,
+					},
+				}
 				subFtpCon.EstabListener()
 				defer subFtpCon.CloseListener()
 
 				seftpCon.SendText(stream, "PASV TCP "+strconv.Itoa(subPort))
 				for {
-					// Get net.TCPConn object
-					subconn, err := subFtpCon.Listener.Accept()
-					if !checkerr(err) {
-						continue
-					}
-					// Setup server side of smux
-					session, err := smux.Server(subconn, nil)
-					if !checkerr(err) {
-						continue
-					}
+					subconn, _ := subFtpCon.Listener.Accept()
+					session, _ := smux.Server(subconn, nil)
 
 					// Accept a stream
-					substream, err := session.AcceptStream()
-					if !checkerr(err) {
-						continue
-					}
+					substream, _ := session.AcceptStream()
 					plainEcho, err := subFtpCon.GetText(substream)
 					if !checkerr(err) {
 						continue
@@ -111,7 +105,12 @@ func handleCommand(seftpCon Controller.TCPController, stream *smux.Stream, plain
 				log.Println("CLOSE SUBCONN")
 				return
 			} else if command[2] == "UDP" {
-				subFtpCon := Controller.KCPController{ServerAddr: ":" + strconv.Itoa(subPort), Passwd: SeFTPConfig.Passwd}
+				subFtpCon := &Controller.KCPController{
+					Controller: Controller.Controller{
+						ServerAddr: ":" + strconv.Itoa(subPort),
+						Passwd:     SeFTPConfig.Passwd,
+					},
+				}
 				subFtpCon.EstabListener()
 				defer subFtpCon.CloseListener()
 
@@ -210,7 +209,12 @@ func handleCommand(seftpCon Controller.TCPController, stream *smux.Stream, plain
 		}
 		filePath := string(command[1])
 		if (len(command) <= 2) || (command[2] == "TCP") {
-			subFtpCon := Controller.TCPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + strconv.Itoa(subPort), Passwd: SeFTPConfig.Passwd}
+			subFtpCon := &Controller.TCPController{
+				Controller: Controller.Controller{
+					ServerAddr: SeFTPConfig.ServerAddr + ":" + strconv.Itoa(subPort),
+					Passwd:     SeFTPConfig.Passwd,
+				},
+			}
 			subFtpCon.EstabListener()
 			defer subFtpCon.CloseListener()
 
@@ -278,7 +282,12 @@ func handleCommand(seftpCon Controller.TCPController, stream *smux.Stream, plain
 				return
 			}
 		} else if command[2] == "UDP" {
-			subFtpCon := Controller.KCPController{ServerAddr: ":" + strconv.Itoa(subPort), Passwd: SeFTPConfig.Passwd}
+			subFtpCon := &Controller.KCPController{
+				Controller: Controller.Controller{
+					ServerAddr: ":" + strconv.Itoa(subPort),
+					Passwd:     SeFTPConfig.Passwd,
+				},
+			}
 			subFtpCon.EstabListener()
 			defer subFtpCon.CloseListener()
 
@@ -388,7 +397,7 @@ func handleCommand(seftpCon Controller.TCPController, stream *smux.Stream, plain
 	}
 }
 
-func handleConnection(seftpCon Controller.TCPController, stream *smux.Stream) {
+func handleConnection(seftpCon Controller.TraController, stream *smux.Stream) {
 	log.Println("Handling new connection...")
 
 	// Close connection when this function ends
@@ -417,7 +426,12 @@ func handleConnection(seftpCon Controller.TCPController, stream *smux.Stream) {
 
 func main() {
 	SeFTPConfig.Parse()
-	seftpCon := Controller.TCPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + strconv.Itoa(SeFTPConfig.ServerPort), Passwd: SeFTPConfig.Passwd}
+	seftpCon := &Controller.TCPController{
+		Controller: Controller.Controller{
+			ServerAddr: SeFTPConfig.ServerAddr + ":" + strconv.Itoa(SeFTPConfig.ServerPort),
+			Passwd:     SeFTPConfig.Passwd,
+		},
+	}
 	seftpCon.EstabListener()
 
 	defer seftpCon.CloseListener()

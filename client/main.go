@@ -16,10 +16,20 @@ var SeFTPConfig = Config{}
 func handleGet(serverCommand []string, clientCommand []string) {
 	if serverCommand[0] != "FILE" {
 		if (len(clientCommand) <= 2) || (clientCommand[2] == "TCP") {
-			subftpCon := Controller.TCPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + serverCommand[2], Passwd: SeFTPConfig.Passwd}
+			subftpCon := &Controller.TCPController{
+				Controller: Controller.Controller{
+					ServerAddr: SeFTPConfig.ServerAddr + ":" + serverCommand[2],
+					Passwd:     SeFTPConfig.Passwd,
+				},
+			}
 			GET(subftpCon)
 		} else if clientCommand[2] == "UDP" {
-			subftpCon := Controller.KCPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + serverCommand[2], Passwd: SeFTPConfig.Passwd}
+			subftpCon := &Controller.KCPController{
+				Controller: Controller.Controller{
+					ServerAddr: SeFTPConfig.ServerAddr + ":" + serverCommand[2],
+					Passwd:     SeFTPConfig.Passwd,
+				},
+			}
 			GET(subftpCon)
 		}
 	}
@@ -28,16 +38,26 @@ func handleGet(serverCommand []string, clientCommand []string) {
 func handlePost(serverCommand []string, clientCommand []string) {
 	if len(clientCommand) >= 2 {
 		if (len(clientCommand) <= 2) || (clientCommand[2] == "TCP") {
-			subftpCon := Controller.TCPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + serverCommand[2], Passwd: SeFTPConfig.Passwd}
+			subftpCon := &Controller.TCPController{
+				Controller: Controller.Controller{
+					ServerAddr: SeFTPConfig.ServerAddr + ":" + serverCommand[2],
+					Passwd:     SeFTPConfig.Passwd,
+				},
+			}
 			POST(subftpCon)
 		} else if clientCommand[2] == "UDP" {
-			subftpCon := Controller.KCPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + serverCommand[2], Passwd: SeFTPConfig.Passwd}
+			subftpCon := &Controller.KCPController{
+				Controller: Controller.Controller{
+					ServerAddr: SeFTPConfig.ServerAddr + ":" + serverCommand[2],
+					Passwd:     SeFTPConfig.Passwd,
+				},
+			}
 			POST(subftpCon)
 		}
 	}
 }
 
-func processRemoteCommand(plainClientCommand string, seftpCon Controller.TCPController) {
+func processRemoteCommand(plainClientCommand string, seftpCon Controller.TraController) {
 	clientCommand := strings.Fields(plainClientCommand)
 	seftpCon.SendText(plainClientCommand)
 	plainServerCommand, rErr := seftpCon.GetText()
@@ -95,7 +115,7 @@ func processLocalCommand(plainClientCommand string) {
 	}
 }
 
-func processCommand(plainClientCommand string, seftpCon Controller.TCPController) {
+func processCommand(plainClientCommand string, seftpCon Controller.TraController) {
 	if IsUpper(strings.Fields(plainClientCommand)[0]) {
 		processRemoteCommand(plainClientCommand, seftpCon)
 	} else {
@@ -105,7 +125,12 @@ func processCommand(plainClientCommand string, seftpCon Controller.TCPController
 
 func main() {
 	SeFTPConfig.Parse()
-	seftpCon := Controller.TCPController{ServerAddr: SeFTPConfig.ServerAddr + ":" + strconv.Itoa(SeFTPConfig.ServerPort), Passwd: SeFTPConfig.Passwd}
+	seftpCon := &Controller.TCPController{
+		Controller: Controller.Controller{
+			ServerAddr: SeFTPConfig.ServerAddr + ":" + strconv.Itoa(SeFTPConfig.ServerPort),
+			Passwd:     SeFTPConfig.Passwd,
+		},
+	}
 	seftpCon.EstabConn()
 
 	defer seftpCon.CloseConn()

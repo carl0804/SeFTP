@@ -88,122 +88,65 @@ func Ls(path string) []string {
 }
 
 //GET is a function to handle GET request.
-func GET(subftpInt interface{}) {
-	if subftpCon, ok := subftpInt.(Controller.TCPController); ok {
-		subftpCon.EstabConn()
-		defer subftpCon.CloseConn()
-		subftpCon.SendText("FILE SIZE")
-		plainCommand, err := subftpCon.GetText()
+func GET(subftpCon Controller.TraController) {
+	subftpCon.EstabConn()
+	defer subftpCon.CloseConn()
+	subftpCon.SendText("FILE SIZE")
+	plainCommand, err := subftpCon.GetText()
+	if !checkerr(err) {
+		return
+	}
+	command := strings.Fields(plainCommand)
+	switch command[0] {
+	case "SIZE":
+		fileSize, err := strconv.Atoi(command[1])
 		if !checkerr(err) {
 			return
 		}
-		command := strings.Fields(plainCommand)
-		switch command[0] {
-		case "SIZE":
-			fileSize, err := strconv.Atoi(command[1])
-			if !checkerr(err) {
-				return
-			}
-			log.Println("FILE SIZE: ", fileSize)
-			reader := bufio.NewReader(os.Stdin)
-			fmt.Print("Enter File Name: ")
-			fileName, _ := reader.ReadString('\n')
-			f, err := os.Create(strings.Fields(fileName)[0])
-			if !checkerr(err) {
-				return
-			}
-			defer f.Close()
-			recvSize := 0
-			subftpCon.SendText("READY")
-
-			progressBar := pb.ProgressBarTemplate(`{{bar . | green}} {{speed . | blue }}`).Start(fileSize)
-
-			var exbuf []byte
-			var buf []byte
-			for recvSize+len(exbuf) < fileSize {
-				buf, exbuf, err = subftpCon.GetByte(exbuf)
-				checkerr(err)
-				recvSize += len(buf)
-				progressBar.Add(len(buf))
-				//log.Println("RECV BYTE LENGTH: ", len(buf))
-				f.Write(buf)
-			}
-			if recvSize < fileSize {
-				lth := exbuf[12:14]
-				//log.Println(lth)
-				length := binary.LittleEndian.Uint16(lth)
-				nonce, exbuf := exbuf[:12], exbuf[14:]
-				data, exbuf := exbuf[:length], exbuf[length:]
-				decData, err := Controller.GCMDecrypter(data, SeFTPConfig.Passwd, nonce)
-				checkerr(err)
-				progressBar.Add(len(exbuf))
-				f.Write(decData)
-			}
-			progressBar.Finish()
-			log.Println("FILE RECEIVED")
-			subftpCon.SendText("HALT")
-			return
-		}
-	} else if subftpCon, ok := subftpInt.(Controller.KCPController); ok {
-		subftpCon.EstabConn()
-		defer subftpCon.CloseConn()
-		subftpCon.SendText("FILE SIZE")
-		plainCommand, err := subftpCon.GetText()
+		log.Println("FILE SIZE: ", fileSize)
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Print("Enter File Name: ")
+		fileName, _ := reader.ReadString('\n')
+		f, err := os.Create(strings.Fields(fileName)[0])
 		if !checkerr(err) {
 			return
 		}
-		command := strings.Fields(plainCommand)
-		switch command[0] {
-		case "SIZE":
-			fileSize, err := strconv.Atoi(command[1])
-			if !checkerr(err) {
-				return
-			}
-			log.Println("FILE SIZE: ", fileSize)
-			reader := bufio.NewReader(os.Stdin)
-			fmt.Print("Enter File Name: ")
-			fileName, _ := reader.ReadString('\n')
-			f, err := os.Create(strings.Fields(fileName)[0])
-			if !checkerr(err) {
-				return
-			}
-			defer f.Close()
-			recvSize := 0
-			subftpCon.SendText("READY")
+		defer f.Close()
+		recvSize := 0
+		subftpCon.SendText("READY")
 
-			progressBar := pb.ProgressBarTemplate(`{{bar . | green}} {{speed . | blue }}`).Start(fileSize)
+		progressBar := pb.ProgressBarTemplate(`{{bar . | green}} {{speed . | blue }}`).Start(fileSize)
 
-			var exbuf []byte
-			var buf []byte
-			for recvSize+len(exbuf) < fileSize {
-				buf, exbuf, err = subftpCon.GetByte(exbuf)
-				checkerr(err)
-				recvSize += len(buf)
-				progressBar.Add(len(buf))
-				//log.Println("RECV BYTE LENGTH: ", len(buf))
-				f.Write(buf)
-			}
-			if recvSize < fileSize {
-				lth := exbuf[12:14]
-				//log.Println(lth)
-				length := binary.LittleEndian.Uint16(lth)
-				nonce, exbuf := exbuf[:12], exbuf[14:]
-				data, exbuf := exbuf[:length], exbuf[length:]
-				decData, err := Controller.GCMDecrypter(data, SeFTPConfig.Passwd, nonce)
-				checkerr(err)
-				progressBar.Add(len(exbuf))
-				f.Write(decData)
-			}
-			progressBar.Finish()
-			log.Println("FILE RECEIVED")
-			subftpCon.SendText("HALT")
-			return
+		var exbuf []byte
+		var buf []byte
+		for recvSize+len(exbuf) < fileSize {
+			buf, exbuf, err = subftpCon.GetByte(exbuf)
+			checkerr(err)
+			recvSize += len(buf)
+			progressBar.Add(len(buf))
+			//log.Println("RECV BYTE LENGTH: ", len(buf))
+			f.Write(buf)
 		}
+		if recvSize < fileSize {
+			lth := exbuf[12:14]
+			//log.Println(lth)
+			length := binary.LittleEndian.Uint16(lth)
+			nonce, exbuf := exbuf[:12], exbuf[14:]
+			data, exbuf := exbuf[:length], exbuf[length:]
+			decData, err := Controller.GCMDecrypter(data, SeFTPConfig.Passwd, nonce)
+			checkerr(err)
+			progressBar.Add(len(exbuf))
+			f.Write(decData)
+		}
+		progressBar.Finish()
+		log.Println("FILE RECEIVED")
+		subftpCon.SendText("HALT")
+		return
 	}
 }
 
 //POST is a function to handle POST request.
-func POST(subftpInt interface{}) {
+func POST(subftpCon Controller.TraController) {
 	fmt.Print("Enter File Name: ")
 	reader := bufio.NewReader(os.Stdin)
 	fileName, _ := reader.ReadString('\n')
@@ -217,98 +160,50 @@ func POST(subftpInt interface{}) {
 		return
 	}
 	fileSize := int(fileInfo.Size())
-	if subftpCon, ok := subftpInt.(Controller.TCPController); ok {
-		log.Println("TCP Controller")
-		subftpCon.EstabConn()
-		defer subftpCon.CloseConn()
+	log.Println("TCP Controller")
+	subftpCon.EstabConn()
+	defer subftpCon.CloseConn()
 
-		log.Println("File size: ", fileSize)
+	log.Println("File size: ", fileSize)
 
-		subftpCon.SendText("SIZE " + strconv.Itoa(fileSize))
+	subftpCon.SendText("SIZE " + strconv.Itoa(fileSize))
 
-		sendSize := 0
-		result, err := subftpCon.GetText()
+	sendSize := 0
+	result, err := subftpCon.GetText()
+	if !checkerr(err) {
+		return
+	}
+	if result == "READY" {
+		log.Println("Server ready")
+		progressBar := pb.ProgressBarTemplate(`{{bar . | green}} {{speed . | blue }}`).Start(fileSize)
+		for sendSize < fileSize {
+			data := make([]byte, 60000)
+			n, err := f.Read(data)
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				log.Println(err)
+				return
+			}
+			data = data[:n]
+			//log.Println("Data:", string(data))
+			subftpCon.SendByte(data)
+			sendSize += n
+			progressBar.Add(n)
+			time.Sleep(time.Microsecond)
+		}
+		progressBar.Finish()
+		log.Println("FILE READ COMPLETE")
+		result, err = subftpCon.GetText()
 		if !checkerr(err) {
 			return
 		}
-		if result == "READY" {
-			log.Println("Server ready")
-			progressBar := pb.ProgressBarTemplate(`{{bar . | green}} {{speed . | blue }}`).Start(fileSize)
-			for sendSize < fileSize {
-				data := make([]byte, 60000)
-				n, err := f.Read(data)
-				if err != nil {
-					if err == io.EOF {
-						break
-					}
-					log.Println(err)
-					return
-				}
-				data = data[:n]
-				//log.Println("Data:", string(data))
-				subftpCon.SendByte(data)
-				sendSize += n
-				progressBar.Add(n)
-				time.Sleep(time.Microsecond)
-			}
-			progressBar.Finish()
-			log.Println("FILE READ COMPLETE")
-			result, err = subftpCon.GetText()
-			if !checkerr(err) {
-				return
-			}
-			if result == "HALT" {
-				log.Println("TRANSFER COMPLETE")
-				return
-			}
-			log.Println("TRANSFER FAILED: ", result)
-		}
-	} else if subftpCon, ok := subftpInt.(Controller.KCPController); ok {
-		log.Println("KCP Controller")
-		subftpCon.EstabConn()
-		defer subftpCon.CloseConn()
-
-		log.Println("File size: ", fileSize)
-
-		subftpCon.SendText("SIZE " + strconv.Itoa(fileSize))
-
-		sendSize := 0
-		result, err := subftpCon.GetText()
-		if !checkerr(err) {
+		if result == "HALT" {
+			log.Println("TRANSFER COMPLETE")
 			return
 		}
-		if result == "READY" {
-			log.Println("Server ready")
-			progressBar := pb.ProgressBarTemplate(`{{bar . | green}} {{speed . | blue }}`).Start(fileSize)
-			for sendSize < fileSize {
-				data := make([]byte, 60000)
-				n, err := f.Read(data)
-				if err != nil {
-					if err == io.EOF {
-						break
-					}
-					log.Println(err)
-					return
-				}
-				data = data[:n]
-				//log.Println("Data:", string(data))
-				subftpCon.SendByte(data)
-				sendSize += n
-				progressBar.Add(n)
-				time.Sleep(time.Microsecond)
-			}
-			progressBar.Finish()
-			log.Println("FILE READ COMPLETE")
-			result, err = subftpCon.GetText()
-			if !checkerr(err) {
-				return
-			}
-			if result == "HALT" {
-				log.Println("TRANSFER COMPLETE")
-				return
-			}
-			log.Println("TRANSFER FAILED: ", result)
-		}
+		log.Println("TRANSFER FAILED: ", result)
 	}
 }
 
