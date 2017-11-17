@@ -173,7 +173,7 @@ func (kcpCon *KCPController) EstabConn() {
 	}
 	conn.SetStreamMode(true)
 	conn.SetWriteDelay(true)
-	conn.SetNoDelay(0, 40, 2, 1)
+	conn.SetNoDelay(1, 20, 2, 1)
 	conn.SetWindowSize(1024, 1024)
 	conn.SetMtu(1350)
 	kcpCon.Conn = conn

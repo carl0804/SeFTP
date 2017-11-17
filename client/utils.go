@@ -141,6 +141,7 @@ func GET(subftpCon Controller.TraController) {
 		progressBar.Finish()
 		log.Println("FILE RECEIVED")
 		subftpCon.SendText("HALT")
+		time.Sleep(time.Second * 2)
 		return
 	}
 }
@@ -160,7 +161,6 @@ func POST(subftpCon Controller.TraController) {
 		return
 	}
 	fileSize := int(fileInfo.Size())
-	log.Println("TCP Controller")
 	subftpCon.EstabConn()
 	defer subftpCon.CloseConn()
 

@@ -1,15 +1,20 @@
 package main
 
 import (
+	"./Controller"
+	"encoding/binary"
 	"encoding/hex"
 	"flag"
+	"github.com/xtaci/smux"
 	"golang.org/x/crypto/sha3"
 	"io"
 	"io/ioutil"
 	"log"
 	"net"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 )
 
 //Config is the config struct for SeFTP.
@@ -96,5 +101,115 @@ func SHA3FileHash(filePath string) (result string, err error) {
 	}
 
 	result = hex.EncodeToString(hash.Sum(nil))
+	return
+}
+
+func GET(substream *smux.Stream, subFtpCon Controller.TraController, fileName string) {
+	plainEcho, err := subFtpCon.GetText(substream)
+	if !checkerr(err) {
+		return
+	}
+	if plainEcho == "FILE SIZE" {
+		f, err := os.Open(fileName)
+		if !checkerr(err) {
+			return
+		}
+		defer f.Close()
+		fileInfo, err := f.Stat()
+		if !checkerr(err) {
+			return
+		}
+		fileSize := int(fileInfo.Size())
+		subFtpCon.SendText(substream, "SIZE "+strconv.Itoa(fileSize))
+		//result, err := subFtpCon.GetText(conn)
+		//checkerr(err)
+		//if result == "READY" {
+		//	log.Println("CLIENT READY")
+		sendSize := 0
+		result, err := subFtpCon.GetText(substream)
+		if !checkerr(err) {
+			return
+		}
+		if result == "READY" {
+			log.Println("CLIENT READY")
+			for sendSize < fileSize {
+				data := make([]byte, 60000)
+				n, err := f.Read(data)
+				if err != nil {
+					if err == io.EOF {
+						break
+					}
+					log.Println(err)
+					return
+				}
+				data = data[:n]
+				//log.Println("Data:", string(data))
+				subFtpCon.SendByte(substream, data)
+				sendSize += n
+				time.Sleep(time.Microsecond)
+			}
+		}
+		log.Println("FILE READ COMPLETE")
+		result, err = subFtpCon.GetText(substream)
+		if !checkerr(err) {
+			return
+		}
+		if result == "HALT" {
+			log.Println("TRANSFER COMPLETE")
+			return
+		} else {
+			log.Println("TRANSFER FAILED: ", result)
+		}
+	} else {
+		subFtpCon.SendText(substream, "UNKNOWN COMMAND")
+	}
+	log.Println("CLOSE SUBCONN")
+	return
+}
+
+func POST(substream *smux.Stream, subFtpCon Controller.TraController, filePath string) {
+	plainEcho, err := subFtpCon.GetText(substream)
+	if !checkerr(err) {
+		return
+	}
+	echo := strings.Fields(plainEcho)
+	log.Println("ECHO: ", plainEcho)
+	if (echo[0] != "SIZE") || (len(echo) != 2) {
+		return
+	}
+	fileSize, err := strconv.Atoi(echo[1])
+	if !checkerr(err) {
+		return
+	}
+	f, err := os.Create(strings.Fields(filePath)[0])
+	if !checkerr(err) {
+		return
+	}
+	defer f.Close()
+	recvSize := 0
+	subFtpCon.SendText(substream, "READY")
+
+	var exbuf []byte
+	var buf []byte
+	for recvSize+len(exbuf) < fileSize {
+		buf, exbuf, err = subFtpCon.GetByte(exbuf, substream)
+		checkerr(err)
+		recvSize += len(buf)
+		//log.Println("RECV BYTE LENGTH: ", len(buf))
+		f.Write(buf)
+	}
+	if recvSize < fileSize {
+		lth := exbuf[12:14]
+		//log.Println(lth)
+		length := binary.LittleEndian.Uint16(lth)
+		nonce, exbuf := exbuf[:12], exbuf[14:]
+		data, _ := exbuf[:length], exbuf[length:]
+		decData, err := Controller.GCMDecrypter(data, SeFTPConfig.Passwd, nonce)
+		checkerr(err)
+		f.Write(decData)
+	}
+	log.Println("FILE RECEIVED")
+	subFtpCon.SendText(substream, "HALT")
+	time.Sleep(time.Second)
 	return
 }
